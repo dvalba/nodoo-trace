@@ -9,7 +9,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CreateActorDto } from '../../actor/dto/create-actor.dto.js';
 
 export class RegisterActorDto extends CreateActorDto {
-  // Hereda: legalName, activityCodes
+  // Hereda: legalName, organizationNumber
 
   @ApiProperty({ description: 'Owner account email', example: 'owner@acme.com' })
   @IsEmail({}, { message: 'email must be a valid email address' })

@@ -11,6 +11,9 @@ export class Actor {
   @Column('text')
   name: string;
 
+  @Column('text', { nullable: true })
+  organizationNumber: string;
+
   @Column({
     type: 'enum',
     enum: ActorStatus,

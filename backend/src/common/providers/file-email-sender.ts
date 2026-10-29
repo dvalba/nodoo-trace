@@ -6,7 +6,8 @@ import { promises as fs } from 'node:fs';
 interface StoredEmail {
   to: string;
   subject: string;
-  text: string;        // ← solo text, sin html
+  text: string;
+  html: string | null; // ← dev: URLs de verificación solo van en el html
   sentAt: string;
 }
 
@@ -28,6 +29,7 @@ export class FileEmailSender implements EmailSender {
       to: message.to,
       subject: message.subject,
       text: message.text ?? message.html ?? '',
+      html: message.html ?? null,
       sentAt: new Date().toISOString(),
     };
 

@@ -2,17 +2,17 @@ import { Module } from '@nestjs/common';
 import { ActivityTypesService } from './activity-types.service.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityType } from './entities/activity-type.entity.js';
+import { Operation } from './entities/operation.entity.js';
 
 @Module({
   controllers: [],
   providers: [ActivityTypesService],
   imports: [
-    TypeOrmModule.forFeature([ActivityType]),   
+    TypeOrmModule.forFeature([ActivityType, Operation]),
   ],
   exports: [
-    ActivityTypesService
+    ActivityTypesService,
+    TypeOrmModule,
   ],
 })
 export class ActivityTypesModule {}
-
-

@@ -9,6 +9,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC } from '../decorators/public.decorator.js';
 import { ConfigService } from '@nestjs/config';
 import { MetaRoles } from '../decorators/meta-roles.decorator.js';
+import { REQUIRES_OPERATION } from '../decorators/requires-operation.decorator.js';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -32,7 +33,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (isPublic) return true;
 
     const hasAuth =
-        this.reflector.getAllAndOverride(MetaRoles, targets) !== undefined;
+        this.reflector.getAllAndOverride(MetaRoles, targets) !== undefined ||
+        this.reflector.getAllAndOverride(REQUIRES_OPERATION, targets) !==
+          undefined;
     if (hasAuth) return super.canActivate(context);
 
     if (isProd) throw new NotFoundException();

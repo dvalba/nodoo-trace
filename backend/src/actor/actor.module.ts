@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ActorService } from './actor.service.js';
 import { ActorController } from './controllers/actor.controller.js';
-import { ActivityTypesModule } from '../activity-types/activity-types.module.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Actor } from './entities/actor.entity.js';
 
@@ -9,9 +8,8 @@ import { Actor } from './entities/actor.entity.js';
   controllers: [ActorController],
   providers: [ActorService],
   imports: [
-    TypeOrmModule.forFeature([Actor]),
-    ActivityTypesModule
+    TypeOrmModule.forFeature([Actor])
   ],
-  exports:[ActorService]
+  exports:[ActorService, TypeOrmModule]
 })
 export class ActorModule {}

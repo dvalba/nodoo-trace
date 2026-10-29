@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { CreateActorDto } from './dto/create-actor.dto.js';
-import { UpdateActorDto } from './dto/update-actor.dto.js';
 import { EntityManager, QueryRunner, Repository } from 'typeorm';
 import { Actor } from './entities/actor.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ActivityTypesService } from '../activity-types/activity-types.service.js';
 import { ActorStatus } from './enums/actor-status.enum.js';
 import { throwNotFound } from '../common/helpers/crud-exceptions.helper.js';
 
@@ -12,7 +10,6 @@ import { throwNotFound } from '../common/helpers/crud-exceptions.helper.js';
 export class ActorService {
   constructor(
     @InjectRepository(Actor) private readonly actorRepo: Repository<Actor>,
-    private readonly activityService: ActivityTypesService,
   ) {}
 
   async findByEmailInActor(email: string, actorId: string) {
@@ -51,14 +48,12 @@ export class ActorService {
     queryRunner?: QueryRunner,
   ): Promise<Actor> {
     const manager = queryRunner ? queryRunner.manager : this.actorRepo.manager;
-    const { activityCodes, legalName } = dto;
-
-    const activities = await this.activityService.findByCodes(activityCodes);
+    const { legalName, organizationNumber } = dto;
 
     const actor = manager.create(Actor, {
       name: legalName,
+      organizationNumber,
       status: ActorStatus.PENDING_APPROVAL,
-      activities,
     });
 
     return manager.save(actor);
