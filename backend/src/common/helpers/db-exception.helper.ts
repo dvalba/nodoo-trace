@@ -1,17 +1,28 @@
 import {
   BadRequestException,
+  HttpException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 
+export const DB_ERROR_CODE = {
+  UNIQUE_VIOLATION: '23505',
+} as const;
+
+export type DbError = QueryFailedError & {
+  driverError: { code: string; [key: string]: unknown };
+};
+
+export type DbExceptionMapper = (error: DbError) => HttpException;
+
+export interface HandleDbExceptionOptions {
+  mappers?: Partial<Record<string, DbExceptionMapper>>;
+}
+
 /**
  * Type Guard universal para cualquier driver de TypeORM que devuelva un 'code'
  */
-export function isQueryFailedWithCode(
-  error: unknown,
-): error is QueryFailedError & {
-  driverError: { code: string; [key: string]: unknown };
-} {
+export function isQueryFailedWithCode(error: unknown): error is DbError {
   return (
     error instanceof QueryFailedError &&
     typeof error.driverError === 'object' &&
@@ -21,17 +32,34 @@ export function isQueryFailedWithCode(
   );
 }
 
-export function handleDbExceptions(error: unknown): never {
-  if (isQueryFailedWithCode(error)) {
-    if (error.driverError.code === '23505') {
-      const driverErr = error.driverError;
-      const table = (driverErr.table as string) || 'unknown';
-      const detail = (driverErr.detail as string) || 'No detail provided';
+const defaultMappers: Record<string, DbExceptionMapper> = {
+  [DB_ERROR_CODE.UNIQUE_VIOLATION]: (error) => {
+    const table = (error.driverError.table as string) || 'unknown';
+    const detail = (error.driverError.detail as string) || 'No detail provided';
 
-      throw new BadRequestException(
-        `Duplicate record in table '${table}'. ${detail}`,
-      );
-    }
+    return new BadRequestException(
+      `Duplicate record in table '${table}'. ${detail}`,
+    );
+  },
+};
+
+/**
+ * Traduce errores de base de datos a excepciones HTTP.
+ *
+ * Abierto a extensión: recibe mappers por código de error que sobrescriben
+ * los defaults para ese código, sin alterar el comportamiento del resto de
+ * callers.
+ */
+export function handleDbExceptions(
+  error: unknown,
+  options: HandleDbExceptionOptions = {},
+): never {
+  if (isQueryFailedWithCode(error)) {
+    const mapper =
+      options.mappers?.[error.driverError.code] ??
+      defaultMappers[error.driverError.code];
+
+    if (mapper) throw mapper(error);
 
     throw new InternalServerErrorException(
       `Database error occurred: ${error.message} (Code: ${error.driverError.code})`,
