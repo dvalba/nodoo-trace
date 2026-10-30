@@ -4,19 +4,12 @@ import {
 } from 'typeorm';
 import { Product } from '../../products/entities/product.entity.js';
 import { Batch } from '../../products/entities/batch.entity.js';
-
-export enum EpcStatus {
-  ACTIVE = 'active',
-  IN_TRANSIT = 'in_transit',
-  CONSUMED = 'consumed',
-  DAMAGED = 'damaged',
-  EXPIRED = 'expired',
-}
+import { EpcStatus } from '../epics-core/enums/epc-status.enum.js';
 
 @Entity('epcs')
 @Index(['productId'])
 @Index(['batchId'])
-@Index(['parentEpcId'])
+@Index(['parentId'])
 @Index(['ownerActorId'])
 @Index(['custodianActorId'])
 @Index(['producerActorId'])
@@ -38,8 +31,8 @@ export class Epc {
   @JoinColumn({ name: 'batch_id' })
   batch: Batch | null;
 
-  @Column({ name: 'parent_epc_id', type: 'text', nullable: true })
-  parentEpcId: string | null;
+  @Column({ name: 'parent_id', type: 'text', nullable: true })
+  parentId: string | null;
 
   @Column({ name: 'producer_actor_id', type: 'uuid' })
   producerActorId: string;
@@ -53,6 +46,6 @@ export class Epc {
   @Column({ type: 'enum', enum: EpcStatus, default: EpcStatus.ACTIVE })
   status: EpcStatus;
 
-  @CreateDateColumn({ name: 'commissioned_at' })
+  @CreateDateColumn({ name: 'commissioned_at', type: 'timestamptz' })
   commissionedAt: Date;
 }

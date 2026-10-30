@@ -1,4 +1,6 @@
-import { EventType, EventAction, BaseEvent } from '../index.js';
+import { BaseEvent } from './base-event.js';
+import { EventAction } from '../enums/event-action.enum.js';
+import { EventType } from '../enums/event-type.enum.js';
 
 export class AggregationEvent extends BaseEvent {
   type: EventType = EventType.AGGREGATION;
@@ -38,7 +40,7 @@ export class AggregationEvent extends BaseEvent {
 // type: OBJECT;
 //  epcList: string[];
 //  bizStep: BizStep;
-//  disposition: Disposition;
+//  disposition: EpcStatus;
 //  batchId: string;
 //  readPointId: string;
 

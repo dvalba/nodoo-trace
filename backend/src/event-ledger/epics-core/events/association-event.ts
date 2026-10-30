@@ -1,4 +1,6 @@
-import { BaseEvent, EventAction, EventType } from '../index.js';
+import { BaseEvent } from './base-event.js';
+import { EventAction } from '../enums/event-action.enum.js';
+import { EventType } from '../enums/event-type.enum.js';
 
 export class AssociationEvent extends BaseEvent {
   type: EventType = EventType.ASSOCIATION;

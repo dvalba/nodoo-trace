@@ -1,7 +1,7 @@
 
 export * from './enums/biz-step.enum.js';
 export * from './enums/biz-transaction-type.enum.js';
-export * from './enums/disposition.enum.js';
+export * from './enums/epc-status.enum.js';
 export * from './enums/event-action.enum.js';
 export * from './enums/event-type.enum.js';
 

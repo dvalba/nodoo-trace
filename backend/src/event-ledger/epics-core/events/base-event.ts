@@ -1,4 +1,4 @@
-import { EventType } from '../index.js';
+import { EventType } from '../enums/event-type.enum.js';
 
 export abstract class BaseEvent {
   batchId: string;
