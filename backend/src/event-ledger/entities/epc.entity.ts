@@ -2,8 +2,8 @@ import {
   Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from 'typeorm';
-import { Product } from './product.entity.js';
-import { Batch } from './batch.entity.js';
+import { Product } from '../../products/entities/product.entity.js';
+import { Batch } from '../../products/entities/batch.entity.js';
 
 export enum EpcStatus {
   ACTIVE = 'active',

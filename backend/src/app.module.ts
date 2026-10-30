@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './auth/guards/roles.guard.js';
 import { AdminModule } from './admin/admin.module.js';
 import { OperationsModule } from './operations/operations.module.js';
+import { ProductsModule } from './products/products.module.js';
 import { EventLedgerModule } from './event-ledger/event-ledger.module.js';
 
 @Module({
@@ -41,6 +42,7 @@ import { EventLedgerModule } from './event-ledger/event-ledger.module.js';
     InvitationsModule,
     AdminModule,
     OperationsModule,
+    ProductsModule,
     EventLedgerModule,
   ],
   controllers: [],

@@ -2,7 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from 'typeorm';
-import { Product } from './product.entity.js';
+import type { Product } from './product.entity.js';
 
 @Entity('batches')
 @Index(['productId', 'batchCode'], { unique: true })
@@ -13,11 +13,11 @@ export class Batch {
   @Column({ name: 'product_id', type: 'uuid' })
   productId: string;
 
-  @ManyToOne(() => Product, (product) => product.batches)
+  @ManyToOne('Product', 'batches')
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @Column({ name: 'batch_code', type: 'text' })
+  @Column({ name: 'batch_code', type: 'varchar', length: 128 })
   batchCode: string;
 
   @CreateDateColumn({ name: 'created_at' })
