@@ -1,14 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ProductsModule } from '../products/products.module.js';
+import { Batch } from '../products/entities/batch.entity.js';
 import { EventLedgerService } from './event-ledger.service.js';
-import { EventLedgerController } from './event-ledger.controller.js';
+import { EpcsController } from './controllers/epcs.controller.js';
 import { LedgerEvent } from './entities/ledger-event.entity.js';
 import { EventEpc } from './entities/event-epc.entity.js';
 import { Epc } from './entities/epc.entity.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([LedgerEvent, EventEpc, Epc])],
-  controllers: [EventLedgerController],
+  imports: [
+    TypeOrmModule.forFeature([LedgerEvent, EventEpc, Epc, Batch]),
+    ProductsModule,
+  ],
+  controllers: [EpcsController],
   providers: [EventLedgerService],
   exports: [TypeOrmModule],
 })
