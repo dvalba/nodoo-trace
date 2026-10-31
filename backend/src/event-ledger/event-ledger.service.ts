@@ -79,6 +79,7 @@ export class EventLedgerService {
             disposition: EpcStatus.ACTIVE,
             action: EventAction.ADD,
             epcList: [epcId],
+            productId: product.id,
             batchId,
             readPointId: null,
             actorId,
