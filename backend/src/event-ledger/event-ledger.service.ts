@@ -47,6 +47,24 @@ interface AppendOptions {
   reloadIds: string[];
 }
 
+export interface EpcHistoryEntry {
+  role: EventEpcRole;
+  id: string;
+  type: EventType;
+  eventTime: Date;
+  recordedAt: Date;
+  actorId: string;
+  batchId: string | null;
+  readPointId: string | null;
+  bizStep: BizStep | null;
+  bizTransactionType: string | null;
+  bizTransactionId: string | null;
+  disposition: EpcStatus | null;
+  source: string;
+  eventUid: string | null;
+  payload: Record<string, unknown>;
+}
+
 @Injectable()
 export class EventLedgerService {
   constructor(
@@ -57,6 +75,8 @@ export class EventLedgerService {
     private readonly epcRepo: Repository<Epc>,
     @InjectRepository(Batch)
     private readonly batchRepo: Repository<Batch>,
+    @InjectRepository(EventEpc)
+    private readonly eventEpcRepo: Repository<EventEpc>,
   ) {}
 
   async commission(actorId: string, dto: CommissionEpcDto): Promise<Epc> {
@@ -365,6 +385,45 @@ export class EventLedgerService {
     }
 
     return epc;
+  }
+
+  async getHistory(
+    actorId: string,
+    epcId: string,
+  ): Promise<EpcHistoryEntry[]> {
+    await this.getEpc(actorId, epcId);
+
+    const links = await this.eventEpcRepo
+      .createQueryBuilder('link')
+      .innerJoinAndSelect('link.event', 'event')
+      .where('link.epcId = :epcId', { epcId })
+      .orderBy('event.eventTime', 'ASC')
+      .addOrderBy('event.id', 'ASC')
+      .getMany();
+
+    return links.map((link) => this.toHistoryEntry(link));
+  }
+
+  private toHistoryEntry(link: EventEpc): EpcHistoryEntry {
+    const event = link.event;
+
+    return {
+      role: link.role,
+      id: event.id,
+      type: event.type,
+      eventTime: event.eventTime,
+      recordedAt: event.recordedAt,
+      actorId: event.actorId,
+      batchId: event.batchId,
+      readPointId: event.readPointId,
+      bizStep: event.bizStep,
+      bizTransactionType: event.bizTransactionType,
+      bizTransactionId: event.bizTransactionId,
+      disposition: event.disposition,
+      source: event.source,
+      eventUid: event.eventUid,
+      payload: event.payload,
+    };
   }
 
   private async append(

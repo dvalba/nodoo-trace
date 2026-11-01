@@ -123,6 +123,17 @@ export class EpcsController {
   }
 
   @Auth()
+  @Get(':epc/history')
+  @ApiOperation({
+    summary: 'Get the EPC event history',
+    description:
+      'Returns the ledger events the EPC took part in, in chronological order. Only its producer, owner or custodian organization can read it.',
+  })
+  history(@Caller() user: AuthUser, @Param('epc') epc: string) {
+    return this.eventLedgerService.getHistory(user.actorId, epc);
+  }
+
+  @Auth()
   @Get(':epc')
   @ApiOperation({
     summary: 'Get the EPC digital twin',
