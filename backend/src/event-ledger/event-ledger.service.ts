@@ -30,6 +30,24 @@ import {
 
 const EPC_URN_PREFIX = 'urn:nodoo:epc:';
 
+function custodyTarget(
+  payload: Record<string, unknown>,
+): string | undefined {
+  const transfer = payload.custodyTransfer;
+
+  if (
+    typeof transfer !== 'object' ||
+    transfer === null ||
+    Array.isArray(transfer)
+  ) {
+    return undefined;
+  }
+
+  const to = (transfer as Record<string, unknown>).to;
+
+  return typeof to === 'string' ? to : undefined;
+}
+
 interface EventDraft {
   type: EventType;
   bizStep: BizStep | null;
@@ -391,8 +409,22 @@ export class EventLedgerService {
     actorId: string,
     epcId: string,
   ): Promise<EpcHistoryEntry[]> {
-    await this.getEpc(actorId, epcId);
+    const epc = await this.epcRepo.findOne({ where: { id: epcId } });
+    if (!epc) throwNotFound('Epc', epcId);
 
+    const history = await this.readHistory(epcId);
+
+    if (epc.ownerActorId === actorId || epc.producerActorId === actorId) {
+      return history;
+    }
+
+    const window = this.custodianWindow(history, actorId);
+    if (window.length === 0) throwNotFound('Epc', epcId);
+
+    return window;
+  }
+
+  private async readHistory(epcId: string): Promise<EpcHistoryEntry[]> {
     const links = await this.eventEpcRepo
       .createQueryBuilder('link')
       .innerJoinAndSelect('link.event', 'event')
@@ -402,6 +434,44 @@ export class EventLedgerService {
       .getMany();
 
     return links.map((link) => this.toHistoryEntry(link));
+  }
+
+  private custodianWindow(
+    history: EpcHistoryEntry[],
+    actorId: string,
+  ): EpcHistoryEntry[] {
+    let custodian: string | null = null;
+    const window: EpcHistoryEntry[] = [];
+
+    for (const entry of history) {
+      const before: string | null = custodian;
+      custodian = this.custodianAfter(entry, custodian);
+
+      if (before === actorId || custodian === actorId) {
+        window.push(entry);
+      }
+    }
+
+    return window;
+  }
+
+  private custodianAfter(
+    entry: EpcHistoryEntry,
+    current: string | null,
+  ): string | null {
+    const mintedHere =
+      (entry.role === EventEpcRole.OBSERVED &&
+        entry.bizStep === BizStep.COMMISSIONING) ||
+      (entry.role === EventEpcRole.OUTPUT &&
+        entry.type === EventType.TRANSFORMATION);
+
+    let custodian = mintedHere ? entry.actorId : current;
+
+    if (entry.bizStep === BizStep.RECEIVING) {
+      custodian = entry.actorId;
+    }
+
+    return custodyTarget(entry.payload) ?? custodian;
   }
 
   private toHistoryEntry(link: EventEpc): EpcHistoryEntry {
