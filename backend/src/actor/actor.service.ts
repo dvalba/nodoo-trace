@@ -39,7 +39,6 @@ export class ActorService {
 
     if (!result.affected) {
       throwNotFound('Actor', actorId);
-      // en Postgres, affected=0 → no existe
     }
   }
 
