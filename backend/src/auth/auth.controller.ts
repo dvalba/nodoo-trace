@@ -1,8 +1,11 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service.js';
 import { RegisterActorDto } from './dto/register-actor-dto.js';
 import { Public } from './decorators/public.decorator.js';
+import { Auth } from './decorators/auth.decorator.js';
+import { Caller } from './decorators/caller.decorator.js';
+import type { AuthUser } from './interfaces/auth-user.interface.js';
 import { LoginDto } from './dto/login.dto.js';
 
 @ApiTags('auth')
@@ -30,6 +33,17 @@ export class AuthController {
   })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Auth()
+  @Get('me')
+  @ApiOperation({
+    summary: 'Get the authenticated user profile and its organization',
+    description:
+      'Returns the current user plus the actor (name and activity types) they belong to.',
+  })
+  me(@Caller() user: AuthUser) {
+    return this.authService.profile(user);
   }
 
   // //TODO PONER UN GUARD PARA QUE SOLO LO HAGAN LOS USUARIOS ADMINS
