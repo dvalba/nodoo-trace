@@ -100,13 +100,19 @@ export class NoticesService {
     actorId: string,
     productId: string,
   ): Promise<ProductNotice[]> {
-    await this.productsService.getProduct(actorId, productId);
-
-    return this.noticeRepo.find({
+    const notices = await this.noticeRepo.find({
       where: { productId },
-      relations: { epcs: true },
+      relations: { epcs: true, product: true },
       order: { createdAt: 'DESC' },
     });
+
+    return (
+      await Promise.all(
+        notices.map(async (notice) =>
+          (await this.canAccess(actorId, notice)) ? notice : null,
+        ),
+      )
+    ).filter((notice): notice is ProductNotice => notice !== null);
   }
 
   async getNotice(actorId: string, noticeId: string): Promise<ProductNotice> {
@@ -158,10 +164,15 @@ export class NoticesService {
     actorId: string,
     noticeId: string,
   ): Promise<ProductNoticeAck[]> {
-    const notice = await this.noticeRepo.findOneBy({ id: noticeId });
+    const notice = await this.noticeRepo.findOne({
+      where: { id: noticeId },
+      relations: { epcs: true, product: true },
+    });
     if (!notice) throwNotFound('ProductNotice', noticeId);
 
-    await this.productsService.getProduct(actorId, notice.productId);
+    if (!(await this.canAccess(actorId, notice))) {
+      throwNotFound('ProductNotice', noticeId);
+    }
 
     return this.ackRepo.find({
       where: { noticeId },

@@ -16,6 +16,6 @@ import { Epc } from './entities/epc.entity.js';
   ],
   controllers: [EpcsController],
   providers: [EventLedgerService, TwinProjector],
-  exports: [TypeOrmModule],
+  exports: [EventLedgerService, TypeOrmModule],
 })
 export class EventLedgerModule {}

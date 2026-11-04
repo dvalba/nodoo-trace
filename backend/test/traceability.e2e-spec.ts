@@ -290,9 +290,16 @@ describe('Traceability API (e2e)', () => {
     expect(acks.body).toHaveLength(1);
     expect(acks.body[0].actorId).toBe(actorB);
 
+    // The partner custodies the affected batch, so it can also list acks.
     await request(server)
       .get(`${prefix}/notices/${noticeId}/acks`)
       .set(authorized(tokenB))
+      .expect(200);
+
+    // An unrelated actor cannot list the acknowledgements.
+    await request(server)
+      .get(`${prefix}/notices/${noticeId}/acks`)
+      .set(authorized(tokenC))
       .expect(404);
   });
 

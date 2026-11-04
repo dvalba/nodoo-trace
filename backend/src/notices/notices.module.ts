@@ -23,6 +23,6 @@ import { ProductNoticesController } from './controllers/product-notices.controll
   ],
   controllers: [NoticesController, ProductNoticesController],
   providers: [NoticesService],
-  exports: [TypeOrmModule],
+  exports: [NoticesService, TypeOrmModule],
 })
 export class NoticesModule {}
