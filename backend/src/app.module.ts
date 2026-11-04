@@ -15,6 +15,7 @@ import { OperationsModule } from './operations/operations.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { EventLedgerModule } from './event-ledger/event-ledger.module.js';
 import { NoticesModule } from './notices/notices.module.js';
+import { SeedModule } from './seed/seed.module.js';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { NoticesModule } from './notices/notices.module.js';
     ProductsModule,
     EventLedgerModule,
     NoticesModule,
+    SeedModule,
   ],
   controllers: [],
   providers: [

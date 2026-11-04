@@ -200,18 +200,37 @@ describe('NoticesService', () => {
     });
   });
 
-  it('only lets the owner list the acknowledgements', async () => {
-    const { service, noticeRepo, ackRepo, getProduct } = makeService();
-    noticeRepo.findOneBy.mockResolvedValue(makeNotice());
-    getProduct.mockResolvedValue(makeNotice().product);
+  it('lets the owner list the acknowledgements without checking EPC relations', async () => {
+    const { service, noticeRepo, ackRepo, epcRepo } = makeService();
+    noticeRepo.findOne.mockResolvedValue(makeNotice());
     ackRepo.find.mockResolvedValue([]);
 
     await service.listAcks('owner', 'n1');
 
-    expect(getProduct).toHaveBeenCalledWith('owner', 'p1');
+    expect(epcRepo.count).not.toHaveBeenCalled();
     expect(ackRepo.find).toHaveBeenCalledWith({
       where: { noticeId: 'n1' },
       order: { acknowledgedAt: 'ASC' },
     });
+  });
+
+  it('hides acknowledgements from actors unrelated to the notice', async () => {
+    const { service, noticeRepo, ackRepo, epcRepo } = makeService();
+    noticeRepo.findOne.mockResolvedValue(
+      makeNotice({
+        epcs: [
+          {
+            noticeId: 'n1',
+            epcId: 'e1',
+          } as ProductNoticeEpc,
+        ],
+      }),
+    );
+    epcRepo.count.mockResolvedValue(0);
+
+    await expect(service.listAcks('stranger', 'n1')).rejects.toThrow(
+      'ProductNotice not found',
+    );
+    expect(ackRepo.find).not.toHaveBeenCalled();
   });
 });

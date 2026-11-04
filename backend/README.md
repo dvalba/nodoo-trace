@@ -37,6 +37,51 @@ La app crea/actualiza el esquema automáticamente cuando `NODE_ENV` no es `produ
 
 Al arrancar se siembran los tipos de actividad, las operaciones y el usuario staff definido en `STAFF_*`.
 
+## Semilla de desarrollo
+
+Con `DEMO_SEED=true` en `backend/.env`, al arrancar se crea (una sola vez, de forma idempotente) una cadena de café realista con cuatro organizaciones ya aprobadas, sus productos/lotes, el historial del libro de eventos con fechas retroactivas (varias semanas atrás) y un advisory con acuses. Sirve para probar todo el flujo sin registrar nada.
+
+Los identificadores (productos, lotes, EPC y aviso) son **deterministas**, por lo que los deep-links de la UI y los ejemplos de esta guía funcionan en cualquier siembra.
+
+> El seed hace *skip* si ya existe (detecta los actores/emails de prueba). Para re-siembrar desde cero, borra los datos de la semilla (o la base) y reinicia.
+
+### Cuentas de prueba
+
+Todas con contraseña **`Demo1234`**:
+
+| Organización | Rol (actividad) | Email |
+| --- | --- | --- |
+| Finca El Roble | `supplier` (productor) | `finca@demo.nodoo.local` |
+| Tostaduría Aroma | `manufacturer` | `tostaduria@demo.nodoo.local` |
+| Distribuciones Andina | `wholesaler` | `distribuciones@demo.nodoo.local` |
+| Cafeterías La Vela | `retailer` | `caferias@demo.nodoo.local` |
+
+### Historia sembrada
+
+El proveedor comisiona 3 sacos de café verde (`GRN-2026-1117`), envía y factura cada uno a la tostadería, que los transforma en 2 paquetes tostados (`RST-2026-1117-A`), los envía/factura al mayorista, y el mayorista reenvía uno al minorista. Queda un advisory del lote tostado con 2 acuses (mayorista y minorista). Los 3 sacos verdes están `consumed`; los 2 paquetes tostados, `active`.
+
+### Prueba rápida (curl)
+
+```bash
+# 1) Login (devuelve accessToken + user)
+TOKEN=$(curl -s -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"caferias@demo.nodoo.local","password":"Demo1234"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
+
+# 2) Gemelo digital de un EPC (el minorista posee uno tostado)
+EPD='urn:nodoo:epc:d71dd322-2b92-4a06-a4eb-8a1b43efecc0'
+curl -s http://localhost:3000/api/v1/epcs/$EPD -H "Authorization: Bearer $TOKEN"
+
+# 3) Historial / trazabilidad (orden cronológico, ventana de custodia)
+curl -s http://localhost:3000/api/v1/epcs/$EPD/history -H "Authorization: Bearer $TOKEN"
+
+# 4) Avisos que puedo ver (por producto)
+curl -s http://localhost:3000/api/v1/products/6b76c49e-de79-45ea-9e84-78bb737d4453/notices \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Otros EPCs de ejemplo: tostado en poder del mayorista `urn:nodoo:epc:7833feff-792d-4be1-bfa7-e376505c9a9d`; sacos verdes (consumidos, custodiados por la tostadería) `urn:nodoo:epc:236af542-6576-4e2f-987f-5239e1f3c3fe`. Aviso de ejemplo: `9fe65a02-0b8c-4a02-8afc-726d0ed00c8a`.
+
 ## Variables de entorno
 
 | Variable | Descripción |
@@ -53,6 +98,7 @@ Al arrancar se siembran los tipos de actividad, las operaciones y el usuario sta
 | `INVITATION_RESEND_INTERVAL` | Espera mínima entre reenvíos (ej. `5m`) |
 | `INVITATION_EXPIRES_IN` | Vida de la invitación (ej. `7d`) |
 | `STAFF_EMAIL`, `STAFF_PASSWORD`, `STAFF_FULL_NAME` | Usuario staff inicial |
+| `DEMO_SEED` | `true` siembra la cadena de desarrollo (ver "Semilla de desarrollo") |
 
 `docker compose` y la aplicación leen el mismo archivo `backend/.env`.
 
