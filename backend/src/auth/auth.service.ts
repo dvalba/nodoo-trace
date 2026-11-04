@@ -12,6 +12,7 @@ import { PlatformRole, UserRole } from '../users/enums/roles.enum.js';
 import { UserStatus } from '../users/enums/user-status.enum.js';
 import { AcceptInviteDto } from '../invitations/dto/accept-invite.dto.js';
 import { ActorStatus } from '../actor/enums/actor-status.enum.js';
+import type { ActivityType } from '../activity-types/entities/activity-type.entity.js';
 import { InvitationsService } from '../invitations/invitations.service.js';
 import { TokenService } from '../common/interfaces/token-service.interface.js';
 import * as bcrypt from 'bcrypt';
@@ -147,6 +148,34 @@ export class AuthService {
         platformRoles: user.platformRoles,
         roles: user.roles,
       },
+    };
+  }
+
+  async profile(user: { id: string; actorId: string | null }) {
+    const [fullUser, actor] = await Promise.all([
+      this.userService.findByIdOrFail(user.id),
+      user.actorId ? this.actorService.findByIdWithActivities(user.actorId) : Promise.resolve(null),
+    ]);
+
+    return {
+      user: {
+        id: fullUser.id,
+        email: fullUser.email,
+        fullName: fullUser.fullName,
+        actorId: fullUser.actorId,
+        platformRoles: fullUser.platformRoles,
+        roles: fullUser.roles,
+      },
+      actor: actor
+        ? {
+            id: actor.id,
+            name: actor.name,
+            activities: (actor.activities ?? []).map((a) => ({
+              code: (a as ActivityType).code,
+              name: (a as ActivityType).name,
+            })),
+          }
+        : null,
     };
   }
 }

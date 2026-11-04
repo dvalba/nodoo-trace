@@ -5,6 +5,7 @@ import { Actor } from './entities/actor.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorStatus } from './enums/actor-status.enum.js';
 import { throwNotFound } from '../common/helpers/crud-exceptions.helper.js';
+import type { ActivityType } from '../activity-types/entities/activity-type.entity.js';
 
 @Injectable()
 export class ActorService {
@@ -21,6 +22,24 @@ export class ActorService {
 
   async findById(id: string) {
     return this.actorRepo.findOneBy({ id });
+  }
+
+  async findByIdWithActivities(id: string) {
+    return this.actorRepo.findOne({ where: { id }, relations: { activities: true } });
+  }
+
+  async getReference(id: string) {
+    const actor = await this.findByIdWithActivities(id);
+    if (!actor) throwNotFound('Actor', id);
+
+    return {
+      id: actor.id,
+      name: actor.name,
+      activities: (actor.activities ?? []).map((a) => ({
+        code: (a as ActivityType).code,
+        name: (a as ActivityType).name,
+      })),
+    };
   }
   async findByIdOrFail(id: string): Promise<Actor> {
     const actor = await this.findById(id);
