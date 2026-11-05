@@ -1,0 +1,22 @@
+{
+  "name": "nodoo-trace",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "setup": "cp -n backend/.env.example backend/.env",
+    "db:up": "docker compose -f backend/docker-compose.yml up -d",
+    "db:down": "docker compose -f backend/docker-compose.yml down",
+    "db:reset": "docker compose -f backend/docker-compose.yml down -v",
+    "start": "pnpm db:up && pnpm dev",
+    "dev": "concurrently -n api,web -c yellow,cyan \"pnpm --filter backend start:dev\" \"pnpm --filter nodoo-trace-web start\"",
+    "dev:backend": "pnpm --filter backend start:dev",
+    "dev:frontend": "pnpm --filter nodoo-trace-web start",
+    "build": "pnpm -r build",
+    "lint": "pnpm --filter backend lint",
+    "test": "pnpm --filter backend test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
