@@ -19,22 +19,25 @@ export const DEMO_PASSWORD = 'Demo1234';
 
 // Deterministic ids so UI deep links and documentation stay valid on any seed.
 export const DEMO_IDS = {
-  greenProduct: 'af1e073a-0216-4288-8b90-adc3639fe2c7',
-  greenBatch: '1f0e9d8c-7b6a-4534-2910-f8e7d6c5b4a3',
-  roastedProduct: '6b76c49e-de79-45ea-9e84-78bb737d4453',
-  roastedBatch: '2a1b8c7d-6e5f-4423-1809-e7d6c5b4a3f2',
-  notice: '9fe65a02-0b8c-4a02-8afc-726d0ed00c8a',
+  vaccineProduct: '3f2b8c1d-9a4e-4b7c-8d21-6e5f4a3b2c10',
+  vaccineBatch: '4a3c9d2e-8b5f-4c6d-9e32-7f6a5b4c3d21',
+  insulinProduct: '5b4d0e3f-9c6a-4d7e-8f43-8a7b6c5d4e32',
+  insulinBatch: '6c5e1f4a-8d7b-4e6f-9a54-9b8c7d6e5f43',
+  notice: '7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a54',
 } as const;
 
+// Cases are the traceable unit: each one is commissioned as an EPC. Pallets
+// are logistics units and are intentionally NOT serialized, so they have no
+// EPC in this demo (and therefore no ledger history).
 export const DEMO_EPC_IDS = {
-  green: [
-    'urn:nodoo:epc:236af542-6576-4e2f-987f-5239e1f3c3fe',
-    'urn:nodoo:epc:6f5b5502-54f5-44a8-b0fb-493aedba7592',
-    'urn:nodoo:epc:c629e5de-acc8-4fd7-88e8-4830d3018eda',
+  vaccine: [
+    'urn:nodoo:epc:1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+    'urn:nodoo:epc:2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+    'urn:nodoo:epc:3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7f',
   ],
-  roasted: [
-    'urn:nodoo:epc:d71dd322-2b92-4a06-a4eb-8a1b43efecc0',
-    'urn:nodoo:epc:7833feff-792d-4be1-bfa7-e376505c9a9d',
+  insulin: [
+    'urn:nodoo:epc:4d5e6f7a-8b9c-4d0e-1f2a-3b4c5d6e7f8a',
+    'urn:nodoo:epc:5e6f7a8b-9c0d-4e1f-2a3b-4c5d6e7f8a9b',
   ],
 } as const;
 
@@ -50,32 +53,25 @@ interface DemoActor {
 
 const DEMO_ACTORS: DemoActor[] = [
   {
-    name: 'Finca El Roble',
+    name: 'Laboratorios FarmaSur',
     organizationNumber: 'NIT-901020301',
-    activityCode: 'supplier',
-    email: 'finca@demo.nodoo.local',
-    fullName: 'Rosa Camargo',
-  },
-  {
-    name: 'Tostaduría Aroma',
-    organizationNumber: 'NIT-901020302',
     activityCode: 'manufacturer',
-    email: 'tostaduria@demo.nodoo.local',
-    fullName: 'Luis Pardo',
+    email: 'laboratorio@demo.nodoo.local',
+    fullName: 'Dra. Elena Ríos',
   },
   {
-    name: 'Distribuciones Andina',
-    organizationNumber: 'NIT-901020303',
+    name: 'Distribuidora MediAndes',
+    organizationNumber: 'NIT-901020302',
     activityCode: 'wholesaler',
-    email: 'distribuciones@demo.nodoo.local',
-    fullName: 'Marta Salinas',
+    email: 'distribuidora@demo.nodoo.local',
+    fullName: 'Carlos Mejía',
   },
   {
-    name: 'Cafeterías La Vela',
-    organizationNumber: 'NIT-901020304',
+    name: 'Hospital San Rafael',
+    organizationNumber: 'NIT-901020303',
     activityCode: 'retailer',
-    email: 'caferias@demo.nodoo.local',
-    fullName: 'Diego Fuentes',
+    email: 'hospital@demo.nodoo.local',
+    fullName: 'Dra. Paula Gómez',
   },
 ];
 
@@ -124,147 +120,144 @@ export class DemoSeedService implements OnApplicationBootstrap {
     const hasDemoActors = (await actorRepo.find()).some((actor) =>
       DEMO_ACTORS.some((demo) => demo.name === actor.name),
     );
-    if (hasDemoActors || (await this.usersService.findByEmail(DEMO_EMAILS[0]))) {
-      this.logger.log('Demo seed already present, skipping.');
+    const legacyDemo = (await this.dataSource.query(
+      "select 1 from users where email like '%@demo.nodoo.local' limit 1",
+    )) as unknown[];
+
+    if (hasDemoActors || legacyDemo.length > 0) {
+      this.logger.log(
+        'Demo data already present, skipping. Run `pnpm db:reset` and restart to load the pharmaceutical demo.',
+      );
       return;
     }
 
     // ── Organizations and owners ────────────────────────────────────────────
-    const supplier = await this.seedActor(actorRepo, DEMO_ACTORS[0]);
-    const manufacturer = await this.seedActor(actorRepo, DEMO_ACTORS[1]);
-    const wholesaler = await this.seedActor(actorRepo, DEMO_ACTORS[2]);
-    const retailer = await this.seedActor(actorRepo, DEMO_ACTORS[3]);
+    const manufacturer = await this.seedActor(actorRepo, DEMO_ACTORS[0]);
+    const distributor = await this.seedActor(actorRepo, DEMO_ACTORS[1]);
+    const hospital = await this.seedActor(actorRepo, DEMO_ACTORS[2]);
 
     // ── Catalog (fixed ids so UI deep links stay valid across seeds) ────────
     const productRepo = this.dataSource.getRepository(Product);
     const batchRepo = this.dataSource.getRepository(Batch);
 
-    const greenProduct = await productRepo.save(
+    const vaccineProduct = await productRepo.save(
       productRepo.create({
-        id: DEMO_IDS.greenProduct,
-        createdByActorId: supplier.id,
-        sku: 'CAFE-VERDE-1KG',
-        name: 'Café verde 1kg',
-      }),
-    );
-    const greenBatch = await batchRepo.save(
-      batchRepo.create({
-        id: DEMO_IDS.greenBatch,
-        productId: greenProduct.id,
-        batchCode: 'GRN-2026-1117',
-      }),
-    );
-
-    const roastedProduct = await productRepo.save(
-      productRepo.create({
-        id: DEMO_IDS.roastedProduct,
+        id: DEMO_IDS.vaccineProduct,
         createdByActorId: manufacturer.id,
-        sku: 'CAFE-TOSTADO-500G',
-        name: 'Café tostado 500g',
+        sku: 'VAC-FLU-05',
+        name: 'Vacuna antigripal 0.5 mL',
       }),
     );
-    const roastedBatch = await batchRepo.save(
+    const vaccineBatch = await batchRepo.save(
       batchRepo.create({
-        id: DEMO_IDS.roastedBatch,
-        productId: roastedProduct.id,
-        batchCode: 'RST-2026-1117-A',
+        id: DEMO_IDS.vaccineBatch,
+        productId: vaccineProduct.id,
+        batchCode: 'LOTE-VAC-2026-1117-A',
       }),
     );
 
-    // ── Ledger story ─────────────────────────────────────────────────────────
-    // Supplier commissions three 1kg bags of green beans, ships each one to
-    // the roaster and invoices them over.
-    const bagA = await this.eventLedgerService.commission(supplier.id, {
-      productId: greenProduct.id,
-      batchId: greenBatch.id,
-    });
-    const bagB = await this.eventLedgerService.commission(supplier.id, {
-      productId: greenProduct.id,
-      batchId: greenBatch.id,
-    });
-    const bagC = await this.eventLedgerService.commission(supplier.id, {
-      productId: greenProduct.id,
-      batchId: greenBatch.id,
-    });
-
-    for (const bag of [bagA, bagB, bagC]) {
-      await this.eventLedgerService.ship(supplier.id, bag.id);
-      await this.eventLedgerService.invoice(supplier.id, bag.id, {
-        bizTransactionId: 'INV-2026-0001',
-        ownershipTransferTo: manufacturer.id,
-      });
-      await this.eventLedgerService.receive(manufacturer.id, bag.id);
-    }
-
-    // ── Deterministic ids so UI deep links stay valid across seeds ─────────
-    await this.reassignEpcIds([bagA, bagB, bagC], DEMO_EPC_IDS.green);
-
-    // Roaster transforms the three bags into two 500g roasted packs.
-    const [roasted1, roasted2] = await this.eventLedgerService.transform(
-      manufacturer.id,
-      {
-        inputEpcs: [
-          DEMO_EPC_IDS.green[0],
-          DEMO_EPC_IDS.green[1],
-          DEMO_EPC_IDS.green[2],
-        ],
-        outputProductId: roastedProduct.id,
-        outputBatchId: roastedBatch.id,
-        outputCount: 2,
-      },
+    const insulinProduct = await productRepo.save(
+      productRepo.create({
+        id: DEMO_IDS.insulinProduct,
+        createdByActorId: manufacturer.id,
+        sku: 'INS-GLA-100',
+        name: 'Insulina glargina 100 UI/mL',
+      }),
+    );
+    const insulinBatch = await batchRepo.save(
+      batchRepo.create({
+        id: DEMO_IDS.insulinBatch,
+        productId: insulinProduct.id,
+        batchCode: 'LOTE-INS-2026-1117-B',
+      }),
     );
 
-    await this.reassignEpcIds([roasted1, roasted2], DEMO_EPC_IDS.roasted);
-
-    // Roaster ships both packs to the wholesaler and invoices them over.
-    for (const pack of [roasted1, roasted2]) {
-      await this.eventLedgerService.ship(manufacturer.id, pack.id);
-      await this.eventLedgerService.invoice(manufacturer.id, pack.id, {
-        bizTransactionId: 'INV-2026-0002',
-        ownershipTransferTo: wholesaler.id,
-      });
-      await this.eventLedgerService.receive(wholesaler.id, pack.id);
+    // ── Traceable cases ─────────────────────────────────────────────────────
+    // Each case is commissioned as an EPC. The pallets that group them are
+    // not serialized, so they deliberately do not appear in the ledger.
+    const vaccineCases = [];
+    for (let i = 0; i < DEMO_EPC_IDS.vaccine.length; i += 1) {
+      vaccineCases.push(
+        await this.eventLedgerService.commission(manufacturer.id, {
+          productId: vaccineProduct.id,
+          batchId: vaccineBatch.id,
+        }),
+      );
     }
 
-    // Wholesaler forwards one pack to the café and invoices it over.
-    await this.eventLedgerService.ship(wholesaler.id, roasted1.id);
-    await this.eventLedgerService.invoice(wholesaler.id, roasted1.id, {
-      bizTransactionId: 'INV-2026-0003',
-      ownershipTransferTo: retailer.id,
+    const insulinCases = [];
+    for (let i = 0; i < DEMO_EPC_IDS.insulin.length; i += 1) {
+      insulinCases.push(
+        await this.eventLedgerService.commission(manufacturer.id, {
+          productId: insulinProduct.id,
+          batchId: insulinBatch.id,
+        }),
+      );
+    }
+
+    await this.reassignEpcIds(vaccineCases, DEMO_EPC_IDS.vaccine);
+    await this.reassignEpcIds(insulinCases, DEMO_EPC_IDS.insulin);
+
+    // The manufacturer ships and invoices every case to the distributor,
+    // which receives each case into custody.
+    for (const cases of [vaccineCases, insulinCases]) {
+      for (const item of cases) {
+        await this.eventLedgerService.ship(manufacturer.id, item.id);
+        await this.eventLedgerService.invoice(manufacturer.id, item.id, {
+          bizTransactionId: 'INV-2026-0001',
+          ownershipTransferTo: distributor.id,
+        });
+        await this.eventLedgerService.receive(distributor.id, item.id);
+      }
+    }
+
+    // The distributor forwards one vaccine case to the hospital and it is
+    // received there.
+    const vaccineToHospital = vaccineCases[0].id;
+    await this.eventLedgerService.ship(distributor.id, vaccineToHospital);
+    await this.eventLedgerService.invoice(distributor.id, vaccineToHospital, {
+      bizTransactionId: 'INV-2026-0002',
+      ownershipTransferTo: hospital.id,
     });
-    await this.eventLedgerService.receive(retailer.id, roasted1.id);
+    await this.eventLedgerService.receive(hospital.id, vaccineToHospital);
+
+    // One insulin case is invoiced to the hospital but left in transit, so the
+    // demo also shows a case that has not been received yet.
+    const insulinToHospital = insulinCases[0].id;
+    await this.eventLedgerService.ship(distributor.id, insulinToHospital);
+    await this.eventLedgerService.invoice(distributor.id, insulinToHospital, {
+      bizTransactionId: 'INV-2026-0003',
+      ownershipTransferTo: hospital.id,
+    });
 
     // ── Backdate so the story reads like real history ──────────────────────
     await this.backdateActors([
-      { id: supplier.id, days: 40 },
-      { id: manufacturer.id, days: 39 },
-      { id: wholesaler.id, days: 38 },
-      { id: retailer.id, days: 37 },
+      { id: manufacturer.id, days: 40 },
+      { id: distributor.id, days: 39 },
+      { id: hospital.id, days: 38 },
     ]);
     await this.backdateUsers(DEMO_EMAILS, 39);
     await this.backdateEpcEvents([
-      { ids: [bagA.id, bagB.id, bagC.id], days: 36 },
-      { ids: [roasted1.id, roasted2.id], days: 30 },
+      { ids: vaccineCases.map((item) => item.id), days: 36 },
+      { ids: insulinCases.map((item) => item.id), days: 30 },
     ]);
     await this.backdateTwin([
-      { id: bagA.id, days: 36 },
-      { id: bagB.id, days: 36 },
-      { id: bagC.id, days: 36 },
-      { id: roasted1.id, days: 30 },
-      { id: roasted2.id, days: 30 },
+      ...vaccineCases.map((item) => ({ id: item.id, days: 36 })),
+      ...insulinCases.map((item) => ({ id: item.id, days: 30 })),
     ]);
 
-    // ── Advisory with acknowledgements (fixed id, created directly) ────────
+    // ── Recall with acknowledgements (fixed id, created directly) ──────────
     await this.createNoticeDirect(
       manufacturer.id,
-      roastedProduct.id,
-      roastedBatch.id,
-      [wholesaler.id, retailer.id],
+      vaccineProduct.id,
+      vaccineBatch.id,
+      [distributor.id, hospital.id],
     );
     await this.backdateNotice(DEMO_NOTICE_ID, 2);
 
     this.logger.log(
-      `Demo EPCs: green ${bagA.id}, roasted ${roasted1.id}, ${roasted2.id}`,
+      `Demo cases: vaccine ${vaccineCases.map((item) => item.id).join(', ')}; ` +
+        `insulin ${insulinCases.map((item) => item.id).join(', ')}`,
     );
   }
 
@@ -379,24 +372,28 @@ export class DemoSeedService implements OnApplicationBootstrap {
     batchId: string,
     ackActorIds: string[],
   ): Promise<void> {
-    const roastedEpcIds = [DEMO_EPC_IDS.roasted[0], DEMO_EPC_IDS.roasted[1]];
+    const affectedEpcIds = [
+      DEMO_EPC_IDS.vaccine[0],
+      DEMO_EPC_IDS.vaccine[1],
+    ];
     await this.dataSource.transaction(async (manager) => {
       await manager.save(
         manager.create(ProductNotice, {
           id: DEMO_NOTICE_ID,
           productId,
           batchId,
-          type: NoticeType.ADVISORY,
-          title: 'Aviso de control de humedad — lote RST-2026-1117-A',
+          type: NoticeType.RECALL,
+          title: 'Retiro preventivo — desviación de temperatura LOTE-VAC-2026-1117-A',
           description:
-            'Una auditoría rutinaria de humedad detectó un lote fuera del rango ' +
-              'objetivo. Los lotes afectados deben resecarse antes de continuar ' +
-              'su distribución. No se espera riesgo para la salud del consumidor.',
+            'Durante el transporte se registró una excursión de temperatura en ' +
+              'el lote LOTE-VAC-2026-1117-A. Las cajas afectadas identificadas ' +
+              'por EPC deben retirarse y devolverse al laboratorio. Los pallets ' +
+              'no están serializados: la trazabilidad se hace caja por caja.',
           createdByActorId: actorId,
         }),
       );
       await manager.save(
-        roastedEpcIds.map((epcId) =>
+        affectedEpcIds.map((epcId) =>
           manager.create(ProductNoticeEpc, { noticeId: DEMO_NOTICE_ID, epcId }),
         ),
       );
