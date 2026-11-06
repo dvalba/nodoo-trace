@@ -25,15 +25,15 @@ NestJS 12 · TypeORM · PostgreSQL 16 · JWT · Vitest · Supertest.
 ```bash
 cd backend
 cp .env.example .env      # ajusta secretos y credenciales
-docker compose up -d      # PostgreSQL en localhost:5432
+docker compose up -d      # PostgreSQL en localhost:5434
 pnpm install
 pnpm start:dev
 ```
 
 La app crea/actualiza el esquema automáticamente cuando `NODE_ENV` no es `production` (`synchronize`). No hay migraciones todavía.
 
-- API: `http://localhost:3000/api/v1`
-- Swagger: `http://localhost:3000/docs`
+- API: `http://localhost:3001/api/v1`
+- Swagger: `http://localhost:3001/docs`
 
 Al arrancar se siembran los tipos de actividad, las operaciones y el usuario staff definido en `STAFF_*`.
 
@@ -64,19 +64,19 @@ El proveedor comisiona 3 sacos de café verde (`GRN-2026-1117`), envía y factur
 
 ```bash
 # 1) Login (devuelve accessToken + user)
-TOKEN=$(curl -s -X POST http://localhost:3000/api/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:3001/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"caferias@demo.nodoo.local","password":"Demo1234"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
 
 # 2) Gemelo digital de un EPC (el minorista posee uno tostado)
 EPD='urn:nodoo:epc:d71dd322-2b92-4a06-a4eb-8a1b43efecc0'
-curl -s http://localhost:3000/api/v1/epcs/$EPD -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:3001/api/v1/epcs/$EPD -H "Authorization: Bearer $TOKEN"
 
 # 3) Historial / trazabilidad (orden cronológico, ventana de custodia)
-curl -s http://localhost:3000/api/v1/epcs/$EPD/history -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:3001/api/v1/epcs/$EPD/history -H "Authorization: Bearer $TOKEN"
 
 # 4) Avisos que puedo ver (por producto)
-curl -s http://localhost:3000/api/v1/products/6b76c49e-de79-45ea-9e84-78bb737d4453/notices \
+curl -s http://localhost:3001/api/v1/products/6b76c49e-de79-45ea-9e84-78bb737d4453/notices \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -87,7 +87,7 @@ Otros EPCs de ejemplo: tostado en poder del mayorista `urn:nodoo:epc:7833feff-79
 | Variable | Descripción |
 | --- | --- |
 | `NODE_ENV` | `development`, `test` o `production` |
-| `PORT` | Puerto HTTP (por defecto `3000`) |
+| `PORT` | Puerto HTTP (por defecto `3001`) |
 | `PLATFORM_NAME` | Nombre mostrado en plantillas de email |
 | `HOST_FRONT` | URL del frontend para enlaces de invitación/verificación |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | Conexión PostgreSQL |

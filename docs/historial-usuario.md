@@ -1,7 +1,7 @@
 # Historial del usuario
 
 Qué puede hacer un usuario hoy, paso a paso, tal como lo hace la API actual.
-Todo se accede bajo `http://localhost:3000/api/v1` (Swagger en `/docs`).
+Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
 
 ## 1. Un owner registra su organización
 
