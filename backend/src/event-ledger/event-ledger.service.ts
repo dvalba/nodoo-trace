@@ -392,6 +392,29 @@ export class EventLedgerService {
     });
   }
 
+  async listEpc(
+    actorId: string,
+    filter: { productId?: string; batchId?: string } = {},
+  ): Promise<Epc[]> {
+    const scope = [
+      { ownerActorId: actorId },
+      { custodianActorId: actorId },
+      { producerActorId: actorId },
+    ];
+
+    const where = scope.map((entry) => ({
+      ...entry,
+      ...(filter.productId ? { productId: filter.productId } : {}),
+      ...(filter.batchId ? { batchId: filter.batchId } : {}),
+    }));
+
+    return this.epcRepo.find({
+      where,
+      relations: { product: true, batch: true },
+      order: { commissionedAt: 'DESC' },
+    });
+  }
+
   async getEpc(actorId: string, epcId: string): Promise<Epc> {
     const epc = await this.epcRepo.findOne({
       where: { id: epcId },

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Auth } from '../../auth/decorators/auth.decorator.js';
 import { Caller } from '../../auth/decorators/caller.decorator.js';
@@ -120,6 +120,24 @@ export class EpcsController {
   })
   transform(@Caller() user: AuthUser, @Body() dto: TransformEpcsDto) {
     return this.eventLedgerService.transform(user.actorId, dto);
+  }
+
+  @Auth()
+  @Get()
+  @ApiOperation({
+    summary: 'List the EPCs visible to the caller',
+    description:
+      'Returns the EPCs the caller produced, owns or currently custodies, optionally filtered by product or batch.',
+  })
+  list(
+    @Caller() user: AuthUser,
+    @Query('productId') productId?: string,
+    @Query('batchId') batchId?: string,
+  ) {
+    return this.eventLedgerService.listEpc(user.actorId, {
+      productId,
+      batchId,
+    });
   }
 
   @Auth()
