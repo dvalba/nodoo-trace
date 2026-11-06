@@ -1,20 +1,15 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { RegisterActorDto } from './dto/register-actor-dto.js';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../users/users.service.js';
 import { ActorService } from '../actor/actor.service.js';
 import { PlatformRole, UserRole } from '../users/enums/roles.enum.js';
 import { UserStatus } from '../users/enums/user-status.enum.js';
-import { AcceptInviteDto } from '../invitations/dto/accept-invite.dto.js';
 import { ActorStatus } from '../actor/enums/actor-status.enum.js';
 import type { ActivityType } from '../activity-types/entities/activity-type.entity.js';
 import { InvitationsService } from '../invitations/invitations.service.js';
-import { TokenService } from '../common/interfaces/token-service.interface.js';
+import type { User } from '../users/entities/user.entity.js';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
@@ -29,6 +24,7 @@ export class AuthService {
     private readonly inviteService: InvitationsService,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterActorDto) {
@@ -36,8 +32,19 @@ export class AuthService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+    const demoMode = this.config.get<boolean>('DEMO_SEED') === true;
+
     try {
       const actor = await this.actorService.createActor(dto, queryRunner);
+
+      if (demoMode) {
+        await this.actorService.updateStatus(
+          actor.id,
+          ActorStatus.APPROVED,
+          queryRunner.manager,
+        );
+        actor.status = ActorStatus.APPROVED;
+      }
 
       const user = await this.userService.createUser(
         {
@@ -47,26 +54,43 @@ export class AuthService {
           actorId: actor.id,
           platformRoles: [PlatformRole.USER],
           roles: [UserRole.OWNER],
-          status: UserStatus.EMAIL_UNVERIFIED,
+          status: demoMode ? UserStatus.ACTIVE : UserStatus.EMAIL_UNVERIFIED,
         },
         queryRunner,
       );
-      const result = await this.inviteService.createOwnerVerification(
-        actor.id,
-        dto.adminEmail,
-        actor.name,
-        queryRunner,
-      );
-      const emailSent = result.emailSent;
+
+      let emailSent = false;
+      if (!demoMode) {
+        const result = await this.inviteService.createOwnerVerification(
+          actor.id,
+          dto.adminEmail,
+          actor.name,
+          queryRunner,
+        );
+        emailSent = result.emailSent;
+      }
 
       await queryRunner.commitTransaction();
+
       return {
-        actor,
-        user,
+        actor: {
+          id: actor.id,
+          name: actor.name,
+          organizationNumber: actor.organizationNumber,
+          status: actor.status,
+          activities: (actor.activities ?? []).map((activity) => ({
+            code: (activity as ActivityType).code,
+            name: (activity as ActivityType).name,
+          })),
+        },
+        user: this.publicUser(user),
         emailSent,
-        message: emailSent
-          ? 'Registration successful. Check your email to verify your account.'
-          : 'Registration successful, but we could not send the verification email. Please use the resend endpoint.',
+        demoMode,
+        message: demoMode
+          ? 'Organización creada y activada en modo demo. Ya puedes iniciar sesión.'
+          : emailSent
+            ? 'Registration successful. Check your email to verify your account.'
+            : 'Registration successful, but we could not send the verification email. Please use the resend endpoint.',
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -74,6 +98,18 @@ export class AuthService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private publicUser(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      actorId: user.actorId,
+      platformRoles: user.platformRoles,
+      roles: user.roles,
+      status: user.status,
+    };
   }
 
   async login(dto: LoginDto): Promise<LoginResponseDto> {
