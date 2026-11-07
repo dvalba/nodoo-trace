@@ -2,8 +2,10 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, type Observable } from 'rxjs';
 import type {
+  ActivityType,
   ActorRef,
   Batch,
+  CreateNoticePayload,
   Epc,
   EpcHistoryEntry,
   MeResponse,
@@ -22,8 +24,75 @@ export class Api {
     return this.req(this.http.get<MeResponse>(`${BASE}/auth/me`));
   }
 
+  listActivityTypes(): Promise<ActivityType[]> {
+    return this.req(this.http.get<ActivityType[]>(`${BASE}/activity-types`));
+  }
+
   listProducts(): Promise<Product[]> {
     return this.req(this.http.get<Product[]>(`${BASE}/products`));
+  }
+
+  createProduct(payload: { sku: string; name: string }): Promise<Product> {
+    return this.req(this.http.post<Product>(`${BASE}/products`, payload));
+  }
+
+  createBatch(
+    productId: string,
+    payload: { batchCode: string },
+  ): Promise<Batch> {
+    return this.req(
+      this.http.post<Batch>(`${BASE}/products/${productId}/batches`, payload),
+    );
+  }
+
+  commissionEpc(payload: {
+    productId: string;
+    batchId?: string;
+  }): Promise<Epc> {
+    return this.req(this.http.post<Epc>(`${BASE}/epcs`, payload));
+  }
+
+  shipEpc(epcId: string): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(`${BASE}/epcs/${encodeURIComponent(epcId)}/ship`, {}),
+    );
+  }
+
+  receiveEpc(epcId: string): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/receive`,
+        {},
+      ),
+    );
+  }
+
+  invoiceEpc(
+    epcId: string,
+    payload: { bizTransactionId: string; ownershipTransferTo?: string },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/invoice`,
+        payload,
+      ),
+    );
+  }
+
+  listEpcs(): Promise<Epc[]> {
+    return this.req(this.http.get<Epc[]>(`${BASE}/epcs`));
+  }
+
+  createNotice(
+    productId: string,
+    payload: CreateNoticePayload,
+  ): Promise<Notice> {
+    return this.req(
+      this.http.post<Notice>(
+        `${BASE}/products/${productId}/notices`,
+        payload,
+      ),
+    );
   }
 
   listBatches(productId: string): Promise<Batch[]> {

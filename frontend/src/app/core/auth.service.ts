@@ -2,7 +2,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import type { LoginResponse, MeResponse } from './models';
+import type {
+  LoginResponse,
+  MeResponse,
+  RegisterActorPayload,
+  RegisterResponse,
+} from './models';
 
 const TOKEN_KEY = 'nodoo:token';
 const BASE = '/api/v1';
@@ -31,6 +36,12 @@ export class Auth {
       localStorage.setItem(TOKEN_KEY, res.accessToken);
       return res;
     });
+  }
+
+  register(payload: RegisterActorPayload): Promise<RegisterResponse> {
+    return firstValueFrom(
+      this.http.post<RegisterResponse>(`${BASE}/auth/register`, payload),
+    );
   }
 
   me(): Promise<MeResponse> {

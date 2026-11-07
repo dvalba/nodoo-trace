@@ -26,6 +26,35 @@ export interface ActivityRef {
   name: string;
 }
 
+export interface ActivityType {
+  code: string;
+  name: string;
+  description: string | null;
+}
+
+export interface RegisterActorPayload {
+  legalName: string;
+  organizationNumber?: string;
+  activityCodes: string[];
+  adminFullName: string;
+  adminEmail: string;
+  adminPassword: string;
+}
+
+export interface RegisterResponse {
+  actor: {
+    id: string;
+    name: string;
+    organizationNumber: string | null;
+    status: string;
+    activities: ActivityRef[];
+  };
+  user: AuthUser & { status: string };
+  emailSent: boolean;
+  demoMode: boolean;
+  message: string;
+}
+
 export interface ActorRef {
   id: string;
   name: string;
@@ -138,6 +167,14 @@ export interface Notice {
   createdByActorId: string;
   createdAt: string;
   epcs: NoticeEpcLink[];
+}
+
+export interface CreateNoticePayload {
+  type: NoticeType;
+  title: string;
+  description?: string;
+  batchId?: string;
+  epcIds?: string[];
 }
 
 export interface NoticeAck {

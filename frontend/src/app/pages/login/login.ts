@@ -1,25 +1,18 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Auth } from '../../core/auth.service';
 
-const DEMO_ACCOUNTS = [
-  { email: 'finca@demo.nodoo.local', label: 'Finca El Roble', role: 'Proveedor' },
-  { email: 'tostaduria@demo.nodoo.local', label: 'Tostaduría Aroma', role: 'Fabricante' },
-  { email: 'distribuciones@demo.nodoo.local', label: 'Distribuciones Andina', role: 'Mayorista' },
-  { email: 'caferias@demo.nodoo.local', label: 'Cafeterías La Vela', role: 'Minorista' },
-];
-
 @Component({
   selector: 'app-login',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="min-h-screen flex items-center justify-center p-6">
       <div class="w-full max-w-sm">
         <div class="text-2xl font-semibold tracking-tight mb-1">NodooTrace</div>
         <p class="text-mut text-sm mb-6">Inicia sesión para trazar tus productos.</p>
 
-        <form (ngSubmit)="submit()" class="space-y-4" [class.space-y-4]="">
+        <form (ngSubmit)="submit()" class="space-y-4">
           <div>
             <label class="block text-sm mb-1" for="email">Correo</label>
             <input
@@ -45,6 +38,9 @@ const DEMO_ACCOUNTS = [
             />
           </div>
 
+          @if (notice()) {
+            <div class="text-sm" style="color: #5ec88a">{{ notice() }}</div>
+          }
           @if (error()) {
             <div class="text-sm" style="color: #f08a8a">{{ error() }}</div>
           }
@@ -54,23 +50,10 @@ const DEMO_ACCOUNTS = [
           </button>
         </form>
 
-        <div class="mt-8">
-          <div class="text-xs uppercase tracking-wide text-mut mb-3">Cuentas de prueba</div>
-          <div class="grid gap-2">
-            @for (account of demoAccounts; track account.email) {
-              <button
-                type="button"
-                (click)="fill(account.email)"
-                [disabled]="busy()"
-                class="demo-row"
-              >
-                <span class="text-sm">{{ account.label }}</span>
-                <span class="text-xs text-mut">{{ account.role }}</span>
-              </button>
-            }
-          </div>
-          <p class="text-xs text-mut mt-3">Contraseña de todas las cuentas de prueba: Demo1234</p>
-        </div>
+        <p class="text-sm text-mut mt-6 text-center">
+          ¿No tienes organización?
+          <a routerLink="/register" class="link">Regístrate</a>
+        </p>
       </div>
     </div>
   `,
@@ -101,49 +84,36 @@ const DEMO_ACCOUNTS = [
       opacity: 0.6;
       cursor: not-allowed;
     }
-    .demo-row {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.5rem;
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
-      color: var(--color-ink);
-      font-size: 0.875rem;
-      transition: border-color 0.15s ease, background 0.15s ease;
+    .link {
+      color: var(--color-accent);
+      text-decoration: none;
     }
-    .demo-row:hover {
-      border-color: var(--color-accent);
-      background: var(--color-surface-2);
-    }
-    .demo-row:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    .link:hover {
+      text-decoration: underline;
     }
   `,
 })
 export class Login implements OnInit {
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   email = '';
   password = '';
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
-  readonly demoAccounts = DEMO_ACCOUNTS;
+  readonly notice = signal<string | null>(null);
 
   ngOnInit(): void {
     if (this.auth.isAuthenticated()) {
       void this.router.navigate(['/']);
+      return;
     }
-  }
-
-  fill(email: string): void {
-    this.email = email;
-    this.password = 'Demo1234';
-    this.submit();
+    if (this.route.snapshot.queryParamMap.get('registered') === '1') {
+      this.notice.set(
+        'Organización creada. Revisa tu correo para verificar la cuenta.',
+      );
+    }
   }
 
   submit(): void {
@@ -153,6 +123,7 @@ export class Login implements OnInit {
     }
     this.busy.set(true);
     this.error.set(null);
+    this.notice.set(null);
 
     this.auth
       .login(this.email.trim(), this.password)
