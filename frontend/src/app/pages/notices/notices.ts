@@ -11,8 +11,13 @@ import { ActivatedRoute } from '@angular/router';
 import { Api } from '../../core/api.service';
 import { Auth } from '../../core/auth.service';
 import { Directory } from '../../core/directory.service';
-import { DEMO_NOTICES, DEMO_PRODUCTS } from '../../core/demo';
-import type { Notice, NoticeAck } from '../../core/models';
+import type {
+  Batch,
+  Notice,
+  NoticeAck,
+  NoticeType,
+  Product,
+} from '../../core/models';
 
 @Component({
   selector: 'app-notices',
@@ -22,41 +27,129 @@ import type { Notice, NoticeAck } from '../../core/models';
       <div>
         <h1 class="text-xl font-semibold tracking-tight">Avisos</h1>
         <p class="text-sm text-mut mt-1">
-          Retiros y avisos emitidos contra productos y lotes.
+          Retiros y avisos emitidos contra productos, lotes y casos.
         </p>
       </div>
 
       <div class="card">
-        <div class="flex flex-wrap gap-2 items-center">
-          <span class="text-sm text-mut">Producto</span>
-          <select
-            [(ngModel)]="selectedProduct"
-            (change)="selectProduct()"
-            class="field"
+        <div class="flex flex-wrap gap-2 items-end">
+          <div class="flex-1 min-w-[220px]">
+            <label class="block text-sm mb-1" for="product">Producto</label>
+            <select
+              id="product"
+              [(ngModel)]="selectedProduct"
+              (change)="selectProduct()"
+              class="field"
+            >
+              <option value="">Selecciona un producto…</option>
+              @for (product of products(); track product.id) {
+                <option [value]="product.id">{{ product.name }}</option>
+              }
+            </select>
+          </div>
+          <button
+            type="button"
+            class="btn-primary"
+            [disabled]="!selectedProduct"
+            (click)="toggleCreate()"
           >
-            <option value="">Selecciona un producto…</option>
-            @for (product of products(); track product.id) {
-              <option [value]="product.id">{{ product.name }}</option>
-            }
-          </select>
+            {{ showCreate() ? 'Cancelar' : 'Nuevo aviso' }}
+          </button>
         </div>
-        <div class="mt-3">
-            <div class="text-xs uppercase tracking-wide text-mut mb-2">
-            Avisos de ejemplo
-          </div>
-          <div class="flex flex-wrap gap-2">
-            @for (notice of demoNotices; track notice.id) {
-              <button
-                type="button"
-                class="chip"
-                (click)="openNotice(notice.id)"
-              >
-                {{ notice.title }}
-              </button>
+
+        @if (showCreate()) {
+          <div class="mt-4 border-t border-border pt-4 space-y-3">
+            <div class="grid gap-3 sm:grid-cols-[auto_1fr]">
+              <div>
+                <label class="block text-sm mb-1" for="type">Tipo</label>
+                <select id="type" name="type" [(ngModel)]="newNotice.type" class="field">
+                  <option value="advisory">Aviso</option>
+                  <option value="recall">Retiro</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm mb-1" for="title">Título</label>
+                <input
+                  id="title"
+                  name="title"
+                  [(ngModel)]="newNotice.title"
+                  class="field"
+                  placeholder="Retiro preventivo — lote …"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm mb-1" for="description">Descripción</label>
+              <textarea
+                id="description"
+                name="description"
+                [(ngModel)]="newNotice.description"
+                class="field"
+                rows="3"
+                placeholder="Detalle del aviso o retiro…"
+              ></textarea>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label class="block text-sm mb-1" for="batch">Lote afectado</label>
+                <select id="batch" name="batch" [(ngModel)]="newNotice.batchId" class="field">
+                  <option value="">—</option>
+                  @for (batch of batches(); track batch.id) {
+                    <option [value]="batch.id">{{ batch.batchCode }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm mb-1" for="epcIds">
+                  EPCs afectados <span class="text-mut">(separados por coma)</span>
+                </label>
+                <input
+                  id="epcIds"
+                  name="epcIds"
+                  [(ngModel)]="newNotice.epcIds"
+                  class="field font-mono text-xs"
+                  placeholder="urn:nodoo:epc:…, urn:nodoo:epc:…"
+                />
+              </div>
+            </div>
+
+            @if (createError()) {
+              <div class="text-sm" style="color: #f08a8a">{{ createError() }}</div>
             }
+
+            <button type="button" class="btn-primary" [disabled]="createBusy()" (click)="createNotice()">
+              {{ createBusy() ? 'Publicando…' : 'Publicar aviso' }}
+            </button>
           </div>
-        </div>
+        }
       </div>
+
+      @if (selectedProduct) {
+        <section class="card">
+          <h2 class="text-sm font-semibold mb-3">
+            Avisos del producto · {{ notices().length }}
+          </h2>
+          @if (notices().length === 0) {
+            <p class="text-sm text-mut">Este producto no tiene avisos.</p>
+          } @else {
+            <div class="grid gap-2">
+              @for (item of notices(); track item.id) {
+                <button type="button" class="notice-row" (click)="openNotice(item.id)">
+                  <span class="flex items-center gap-2">
+                    <span class="badge" [class.recall]="item.type === 'recall'" [class.advisory]="item.type === 'advisory'">
+                      {{ typeLabel(item.type) }}
+                    </span>
+                    <span class="text-sm">{{ item.title }}</span>
+                  </span>
+                  <span class="text-xs text-mut">{{ date(item.createdAt) }}</span>
+                </button>
+              }
+            </div>
+          }
+        </section>
+      }
 
       <section class="card">
         @let n = notice();
@@ -70,9 +163,9 @@ import type { Notice, NoticeAck } from '../../core/models';
                 </span>
               </div>
               <p class="text-sm text-mut mt-1">
-                {{ n.product?.name ?? 'Producto desconocido' }}
-                @if (n.batchId) {
-                  <span> · lote {{ n.batchId.slice(0, 8) }}</span>
+                {{ n.product?.name ?? 'Producto' }}
+                @if (batchLabel(n)) {
+                  <span> · lote {{ batchLabel(n) }}</span>
                 }
               </p>
             </div>
@@ -109,7 +202,8 @@ import type { Notice, NoticeAck } from '../../core/models';
           </div>
         } @else {
           <p class="text-sm text-mut">
-            Selecciona un producto arriba o abre un aviso de ejemplo para ver los detalles.
+            Selecciona un producto y un aviso para ver los detalles, o abre un
+            aviso desde la trazabilidad de un caso.
           </p>
         }
       </section>
@@ -123,6 +217,7 @@ import type { Notice, NoticeAck } from '../../core/models';
       padding: 1.25rem;
     }
     .field {
+      width: 100%;
       padding: 0.45rem 0.75rem;
       border-radius: 0.5rem;
       border: 1px solid var(--color-border);
@@ -134,15 +229,32 @@ import type { Notice, NoticeAck } from '../../core/models';
       outline: none;
       border-color: var(--color-accent);
     }
-    .chip {
-      padding: 0.35rem 0.7rem;
-      border-radius: 9999px;
+    .btn-primary {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background: var(--color-accent);
+      color: var(--color-accent-ink);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .notice-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-radius: 0.5rem;
       border: 1px solid var(--color-border);
       background: var(--color-surface-2);
       color: var(--color-ink);
-      font-size: 0.75rem;
     }
-    .chip:hover {
+    .notice-row:hover {
       border-color: var(--color-accent);
     }
     .badge {
@@ -161,18 +273,6 @@ import type { Notice, NoticeAck } from '../../core/models';
     .badge.advisory {
       background: #e0b458;
       color: #2a2008;
-    }
-    .btn-primary {
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      background: var(--color-accent);
-      color: var(--color-accent-ink);
-      font-size: 0.875rem;
-      font-weight: 600;
-    }
-    .btn-primary:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
     }
     .ack-row {
       display: flex;
@@ -194,7 +294,9 @@ export class Notices implements OnInit, AfterViewChecked {
   private readonly myActorId = signal<string | null>(null);
 
   selectedProduct = '';
-  readonly products = signal<{ id: string; name: string }[]>([]);
+  readonly products = signal<Product[]>([]);
+  readonly batches = signal<Batch[]>([]);
+  readonly notices = signal<Notice[]>([]);
   readonly notice = signal<Notice | null>(null);
   readonly acks = signal<NoticeAck[]>([]);
   readonly acking = signal(false);
@@ -203,31 +305,43 @@ export class Notices implements OnInit, AfterViewChecked {
     if (!id) {
       return false;
     }
-    return this.acks().some((a) => a.actorId === id);
+    return this.acks().some((ack) => ack.actorId === id);
   });
-  readonly demoNotices = DEMO_NOTICES;
+
+  readonly showCreate = signal(false);
+  readonly createBusy = signal(false);
+  readonly createError = signal<string | null>(null);
+
+  newNotice: {
+    type: NoticeType;
+    title: string;
+    description: string;
+    batchId: string;
+    epcIds: string;
+  } = {
+    type: 'advisory',
+    title: '',
+    description: '',
+    batchId: '',
+    epcIds: '',
+  };
 
   private readonly resolvedActors = new Set<string>();
 
   ngOnInit(): void {
-    this.auth.me().then((me) => {
-      this.myActorId.set(me.actor?.id ?? me.user.actorId);
-    });
+    this.auth
+      .me()
+      .then((me) => this.myActorId.set(me.actor?.id ?? me.user.actorId))
+      .catch(() => this.myActorId.set(null));
 
-    // Populate the product select with the user's own products plus demo
-    // products, so non-owners can still drill into a shared notice.
-    Promise.all([this.api.listProducts(), Promise.resolve(DEMO_PRODUCTS)])
-      .then(([own, demo]) => {
-        const seen = new Set<string>();
-        const all = [...own.map((p) => ({ id: p.id, name: p.name })), ...demo];
-        this.products.set(
-          all.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true))),
-        );
-      })
-      .catch(() => this.products.set(DEMO_PRODUCTS));
+    this.api
+      .listProducts()
+      .then((products) => this.products.set(products))
+      .catch(() => this.products.set([]));
 
     const noticeParam = this.route.snapshot.queryParamMap.get('notice');
     const productParam = this.route.snapshot.queryParamMap.get('product');
+
     if (noticeParam) {
       this.openNotice(noticeParam);
     } else if (productParam) {
@@ -237,36 +351,81 @@ export class Notices implements OnInit, AfterViewChecked {
   }
 
   ngAfterViewChecked(): void {
-    const ackIds = this.acks().map((a) => a.actorId);
-    ackIds.forEach((id) => {
-      if (!this.resolvedActors.has(id)) {
-        this.resolvedActors.add(id);
-        void this.directory.get(id);
+    for (const ack of this.acks()) {
+      if (!this.resolvedActors.has(ack.actorId)) {
+        this.resolvedActors.add(ack.actorId);
+        void this.directory.get(ack.actorId);
       }
-    });
+    }
+  }
+
+  toggleCreate(): void {
+    this.createError.set(null);
+    this.showCreate.update((value) => !value);
   }
 
   selectProduct(): void {
     const id = this.selectedProduct;
-    if (id) {
-      this.listForProduct(id);
-    } else {
+    this.showCreate.set(false);
+    if (!id) {
+      this.notices.set([]);
+      this.batches.set([]);
       this.notice.set(null);
       this.acks.set([]);
+      return;
     }
+    this.listForProduct(id);
   }
 
-  private listForProduct(productId: string): void {
+  createNotice(): void {
+    const productId = this.selectedProduct;
+    if (!productId) {
+      this.createError.set('Selecciona un producto.');
+      return;
+    }
+
+    const title = this.newNotice.title.trim();
+    if (!title) {
+      this.createError.set('Ingresa un título para el aviso.');
+      return;
+    }
+
+    const epcIds = this.newNotice.epcIds
+      .split(/[\s,]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!this.newNotice.batchId && epcIds.length === 0) {
+      this.createError.set('Indica un lote o al menos un EPC afectado.');
+      return;
+    }
+
+    this.createBusy.set(true);
+    this.createError.set(null);
+
     this.api
-      .listNotices(productId)
-      .then((notices) => {
-        if (notices.length === 0) {
-          this.notice.set(null);
-          return;
-        }
-        this.openNotice(notices[0].id);
+      .createNotice(productId, {
+        type: this.newNotice.type,
+        title,
+        description: this.newNotice.description.trim() || undefined,
+        batchId: this.newNotice.batchId || undefined,
+        epcIds: epcIds.length > 0 ? epcIds : undefined,
       })
-      .catch(() => this.notice.set(null));
+      .then((created) => {
+        this.newNotice = {
+          type: 'advisory',
+          title: '',
+          description: '',
+          batchId: '',
+          epcIds: '',
+        };
+        this.showCreate.set(false);
+        return this.listForProduct(productId).then(() =>
+          this.openNotice(created.id),
+        );
+      })
+      .catch((err: unknown) => this.createError.set(this.messageFrom(err)))
+      .finally(() => this.createBusy.set(false));
   }
 
   openNotice(noticeId: string): void {
@@ -276,6 +435,10 @@ export class Notices implements OnInit, AfterViewChecked {
         this.acks.set(acks);
         if (notice.productId) {
           this.selectedProduct = notice.productId;
+          this.api
+            .listBatches(notice.productId)
+            .then((batches) => this.batches.set(batches))
+            .catch(() => this.batches.set([]));
         }
       })
       .catch(() => this.notice.set(null));
@@ -291,7 +454,7 @@ export class Notices implements OnInit, AfterViewChecked {
       .ackNotice(notice.id)
       .then((ack) => {
         const existing = this.acks();
-        if (!existing.some((a) => a.id === ack.id)) {
+        if (!existing.some((item) => item.id === ack.id)) {
           this.acks.set([...existing, ack]);
         }
       })
@@ -307,6 +470,16 @@ export class Notices implements OnInit, AfterViewChecked {
     return type === 'recall' ? 'Retiro' : 'Aviso';
   }
 
+  batchLabel(notice: Notice): string {
+    if (!notice.batchId) {
+      return '';
+    }
+    return (
+      this.batches().find((batch) => batch.id === notice.batchId)?.batchCode ??
+      notice.batchId.slice(0, 8)
+    );
+  }
+
   date(value: string): string {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) {
@@ -319,5 +492,31 @@ export class Notices implements OnInit, AfterViewChecked {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  private listForProduct(productId: string): Promise<void> {
+    return Promise.all([
+      this.api.listBatches(productId).catch(() => [] as Batch[]),
+      this.api.listNotices(productId).catch(() => [] as Notice[]),
+    ]).then(([batches, notices]) => {
+      this.batches.set(batches);
+      this.notices.set(notices);
+      if (notices.length > 0) {
+        this.openNotice(notices[0].id);
+      } else {
+        this.notice.set(null);
+        this.acks.set([]);
+      }
+    });
+  }
+
+  private messageFrom(err: unknown): string {
+    const message = (err as { error?: { message?: unknown } })?.error?.message;
+    if (Array.isArray(message)) {
+      return message.join(' ');
+    }
+    return typeof message === 'string'
+      ? message
+      : 'No se pudo publicar el aviso.';
   }
 }

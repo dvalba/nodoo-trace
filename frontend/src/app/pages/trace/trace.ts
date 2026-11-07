@@ -8,8 +8,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../core/api.service';
+import { Auth } from '../../core/auth.service';
 import { Directory } from '../../core/directory.service';
-import { DEMO_EPCS } from '../../core/demo';
 import type {
   BizStep,
   BizTransactionType,
@@ -70,7 +70,7 @@ const BIZ_STEP_LABELS: Record<BizStep, string> = {
 const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
   po: 'Orden de compra',
   inv: 'Factura',
-  desadv: 'Desadujo',
+  desadv: 'Aviso de despacho',
   bol: 'Guía de remisión',
 };
 
@@ -82,8 +82,8 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
       <div>
         <h1 class="text-xl font-semibold tracking-tight">Trazabilidad</h1>
         <p class="text-sm text-mut mt-1">
-          Consulta un EPC para ver su gemelo digital, su historial completo y
-          sus avisos vinculados.
+          Consulta un caso por su EPC para ver su gemelo digital, el historial
+          completo y sus avisos vinculados.
         </p>
       </div>
 
@@ -109,28 +109,40 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
           </button>
         </div>
 
-        <div class="mt-4">
-          <div class="text-xs uppercase tracking-wide text-mut mb-2">
-            EPCs de ejemplo
-          </div>
-          <div class="flex flex-wrap gap-2">
-            @for (epc of demoEpcs; track epc.urn) {
-              <button
-                type="button"
-                class="chip"
-                [disabled]="busy()"
-                (click)="load(epc.urn)"
-              >
-                {{ epc.label }} · {{ epc.actor }}
-              </button>
-            }
-          </div>
-        </div>
-
         @if (error()) {
           <div class="mt-3 text-sm" style="color: #f08a8a">{{ error() }}</div>
         }
       </div>
+
+      <section class="card">
+        <h2 class="text-sm font-semibold mb-3">
+          Mis casos · {{ myCases().length }}
+        </h2>
+        @if (myCases().length === 0) {
+          <p class="text-sm text-mut">
+            Aún no tienes casos. Genera casos desde la página de Productos.
+          </p>
+        } @else {
+          <div class="grid gap-2 md:grid-cols-2">
+            @for (item of myCases(); track item.id) {
+              <button type="button" class="case-row" (click)="load(item.id)">
+                <span class="flex items-center gap-2">
+                  <span class="badge" [style.background]="statusColor(item.status)" [style.color]="'#0b0f17'">
+                    {{ statusLabel(item.status) }}
+                  </span>
+                  <span class="font-mono text-xs">{{ short(item.id) }}</span>
+                </span>
+                <span class="text-xs text-mut">
+                  {{ item.product?.name ?? 'Producto' }}
+                  @if (item.batch) {
+                    · {{ item.batch.batchCode }}
+                  }
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </section>
 
       @let twin = epc();
       @if (twin) {
@@ -141,16 +153,16 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                 <h2 class="text-sm font-semibold">Gemelo digital</h2>
                 <span
                   class="badge"
-                   [style.background]="statusColor(twin.status)"
+                  [style.background]="statusColor(twin.status)"
                   [style.color]="'#0b0f17'"
                 >
-                   {{ statusLabel(twin.status) }}
+                  {{ statusLabel(twin.status) }}
                 </span>
               </div>
 
               <dl class="space-y-3 text-sm">
                 <div>
-                    <dt class="text-mut text-xs">Producto</dt>
+                  <dt class="text-mut text-xs">Producto</dt>
                   <dd class="mt-0.5">
                     {{ twin.product?.name ?? '—' }}
                     @if (twin.product) {
@@ -159,33 +171,77 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                   </dd>
                 </div>
                 <div>
-                    <dt class="text-mut text-xs">Lote</dt>
+                  <dt class="text-mut text-xs">Lote</dt>
                   <dd class="mt-0.5">{{ twin.batch?.batchCode ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-mut text-xs">Productor</dt>
+                  <dt class="text-mut text-xs">Productor</dt>
                   <dd class="mt-0.5">{{ actorName(twin.producerActorId) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-mut text-xs">Propietario</dt>
+                  <dt class="text-mut text-xs">Propietario</dt>
                   <dd class="mt-0.5">{{ actorName(twin.ownerActorId) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-mut text-xs">Custodio</dt>
+                  <dt class="text-mut text-xs">Custodio</dt>
                   <dd class="mt-0.5">{{ actorName(twin.custodianActorId) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-mut text-xs">Comisionado</dt>
+                  <dt class="text-mut text-xs">Comisionado</dt>
                   <dd class="mt-0.5">{{ date(twin.commissionedAt) }}</dd>
                 </div>
               </dl>
 
               <div class="mt-4 pt-3 border-t border-border">
-                <div class="text-xs text-mut break-all font-mono">
-                  {{ twin.id }}
-                </div>
+                <div class="text-xs text-mut break-all font-mono">{{ twin.id }}</div>
               </div>
             </section>
+
+            @if (canShip() || canReceive() || canInvoice()) {
+              <section class="card">
+                <h2 class="text-sm font-semibold mb-3">Acciones</h2>
+
+                <div class="flex flex-wrap gap-2">
+                  @if (canShip()) {
+                    <button type="button" class="btn-primary" [disabled]="acting()" (click)="ship()">
+                      {{ acting() ? 'Procesando…' : 'Enviar caso' }}
+                    </button>
+                  }
+                  @if (canReceive()) {
+                    <button type="button" class="btn-primary" [disabled]="acting()" (click)="receive()">
+                      {{ acting() ? 'Procesando…' : 'Recibir caso' }}
+                    </button>
+                  }
+                </div>
+
+                @if (canInvoice()) {
+                  <div class="mt-3 space-y-2">
+                    <input
+                      [(ngModel)]="invoiceNumber"
+                      name="invoiceNumber"
+                      class="field"
+                      placeholder="Nº de factura, ej. INV-2026-0004"
+                    />
+                    <input
+                      [(ngModel)]="invoiceRecipient"
+                      name="invoiceRecipient"
+                      class="field"
+                      placeholder="UUID del nuevo propietario (opcional)"
+                    />
+                    <button type="button" class="btn-primary" [disabled]="acting()" (click)="invoice()">
+                      {{ acting() ? 'Procesando…' : 'Registrar factura' }}
+                    </button>
+                  </div>
+                }
+
+                @if (actionError()) {
+                  <div class="text-sm mt-3" style="color: #f08a8a">{{ actionError() }}</div>
+                }
+                @if (actionMessage()) {
+                  <div class="text-sm mt-3" style="color: #5ec88a">{{ actionMessage() }}</div>
+                }
+              </section>
+            }
 
             <section class="card">
               <h2 class="text-sm font-semibold mb-3">Avisos vinculados</h2>
@@ -194,15 +250,9 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
               } @else {
                 <div class="space-y-2">
                   @for (notice of notices(); track notice.id) {
-                    <button
-                      type="button"
-                      class="notice-link"
-                      (click)="goToNotice(notice.id)"
-                    >
+                    <button type="button" class="notice-link" (click)="goToNotice(notice.id)">
                       <span class="text-sm">{{ notice.title }}</span>
-                      <span class="text-xs text-mut">
-                        {{ notice.type }}
-                      </span>
+                      <span class="text-xs text-mut">{{ notice.type }}</span>
                     </button>
                   }
                 </div>
@@ -223,15 +273,16 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                     <li class="timeline-item">
                       <div class="timeline-marker"></div>
                       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span class="text-sm font-medium">
-                          {{ entryLabel(entry) }}
-                        </span>
+                        <span class="text-sm font-medium">{{ entryLabel(entry) }}</span>
                         <span class="text-xs text-mut">{{ actorName(entry.actorId) }}</span>
                       </div>
                       <div class="text-xs text-mut mt-1">
                         {{ date(entry.eventTime) }}
                         @if (entry.bizTransactionId) {
-                          <span> · {{ txnTypeLabel(entry.bizTransactionType) }}: {{ entry.bizTransactionId }}</span>
+                          <span>
+                            · {{ txnTypeLabel(entry.bizTransactionType) }}:
+                            {{ entry.bizTransactionId }}
+                          </span>
                         }
                       </div>
                       @if (entry.disposition) {
@@ -270,6 +321,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
       border: 1px solid var(--color-border);
       background: var(--color-bg);
       color: var(--color-ink);
+      font-size: 0.875rem;
     }
     .field:focus {
       outline: none;
@@ -287,21 +339,21 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
       opacity: 0.6;
       cursor: not-allowed;
     }
-    .chip {
-      padding: 0.35rem 0.7rem;
-      border-radius: 9999px;
+    .case-row {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      align-items: flex-start;
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-radius: 0.5rem;
       border: 1px solid var(--color-border);
       background: var(--color-surface-2);
       color: var(--color-ink);
-      font-size: 0.75rem;
-      transition: border-color 0.15s ease;
     }
-    .chip:hover {
+    .case-row:hover {
       border-color: var(--color-accent);
-    }
-    .chip:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
     }
     .badge {
       display: inline-flex;
@@ -357,6 +409,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
 })
 export class Trace implements OnInit, AfterViewChecked {
   private readonly api = inject(Api);
+  private readonly auth = inject(Auth);
   private readonly directory = inject(Directory);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -367,11 +420,26 @@ export class Trace implements OnInit, AfterViewChecked {
   readonly epc = signal<Epc | null>(null);
   readonly history = signal<EpcHistoryEntry[]>([]);
   readonly notices = signal<Notice[]>([]);
-  readonly demoEpcs = DEMO_EPCS;
+  readonly myCases = signal<Epc[]>([]);
+
+  readonly myActorId = signal<string | null>(null);
+  readonly acting = signal(false);
+  readonly actionError = signal<string | null>(null);
+  readonly actionMessage = signal<string | null>(null);
+
+  invoiceNumber = '';
+  invoiceRecipient = '';
 
   private readonly resolvedActors = new Set<string>();
 
   ngOnInit(): void {
+    this.auth
+      .me()
+      .then((me) => this.myActorId.set(me.actor?.id ?? me.user.actorId))
+      .catch(() => this.myActorId.set(null));
+
+    void this.loadCases();
+
     const epc = this.route.snapshot.queryParamMap.get('epc');
     if (epc) {
       this.query = epc;
@@ -380,7 +448,6 @@ export class Trace implements OnInit, AfterViewChecked {
   }
 
   ngAfterViewChecked(): void {
-    // Ensure actor names resolve for the current twin + history.
     const epc = this.epc();
     const ids = new Set<string>();
     if (epc) {
@@ -415,6 +482,8 @@ export class Trace implements OnInit, AfterViewChecked {
   load(urn: string): void {
     this.busy.set(true);
     this.error.set(null);
+    this.actionError.set(null);
+    this.actionMessage.set(null);
     this.epc.set(null);
     this.history.set([]);
     this.notices.set([]);
@@ -431,14 +500,59 @@ export class Trace implements OnInit, AfterViewChecked {
         }
       })
       .catch((err: unknown) => {
-        const payload = (err as { error?: { message?: unknown } })?.error;
-        this.error.set(
-          typeof payload?.message === 'string'
-            ? payload.message
-            : 'EPC no encontrado o no tienes acceso a él.',
-        );
+        this.error.set(this.messageFrom(err, 'EPC no encontrado o sin acceso.'));
       })
       .finally(() => this.busy.set(false));
+  }
+
+  canShip(): boolean {
+    const twin = this.epc();
+    return !!twin && twin.status === 'active' && this.isCustodian(twin);
+  }
+
+  canReceive(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin &&
+      twin.status === 'in_transit' &&
+      (this.isOwner(twin) || this.isCustodian(twin))
+    );
+  }
+
+  canInvoice(): boolean {
+    const twin = this.epc();
+    return !!twin && this.isOwner(twin);
+  }
+
+  ship(): void {
+    const twin = this.epc();
+    if (!twin) return;
+    void this.runAction(() => this.api.shipEpc(twin.id), 'Caso enviado.');
+  }
+
+  receive(): void {
+    const twin = this.epc();
+    if (!twin) return;
+    void this.runAction(() => this.api.receiveEpc(twin.id), 'Caso recibido.');
+  }
+
+  invoice(): void {
+    const twin = this.epc();
+    if (!twin) return;
+    const bizTransactionId = this.invoiceNumber.trim();
+    if (!bizTransactionId) {
+      this.actionError.set('Ingresa el número de factura.');
+      return;
+    }
+    const recipient = this.invoiceRecipient.trim();
+    void this.runAction(
+      () =>
+        this.api.invoiceEpc(twin.id, {
+          bizTransactionId,
+          ownershipTransferTo: recipient || undefined,
+        }),
+      'Factura registrada.',
+    );
   }
 
   actorName(id: string | null): string {
@@ -486,9 +600,65 @@ export class Trace implements OnInit, AfterViewChecked {
     });
   }
 
+  short(urn: string): string {
+    const parts = urn.split(':');
+    return parts[parts.length - 1].slice(0, 8);
+  }
+
   goToNotice(noticeId: string): void {
     void this.router.navigate(['/notices'], {
       queryParams: { notice: noticeId },
     });
+  }
+
+  private isOwner(twin: Epc): boolean {
+    const id = this.myActorId();
+    return !!id && twin.ownerActorId === id;
+  }
+
+  private isCustodian(twin: Epc): boolean {
+    const id = this.myActorId();
+    return !!id && twin.custodianActorId === id;
+  }
+
+  private async loadCases(): Promise<void> {
+    try {
+      this.myCases.set(await this.api.listEpcs());
+    } catch {
+      this.myCases.set([]);
+    }
+  }
+
+  private async runAction(
+    action: () => Promise<Epc>,
+    successMessage: string,
+  ): Promise<void> {
+    const twin = this.epc();
+    if (!twin) return;
+
+    this.acting.set(true);
+    this.actionError.set(null);
+    this.actionMessage.set(null);
+
+    try {
+      await action();
+      this.actionMessage.set(successMessage);
+      this.invoiceNumber = '';
+      this.invoiceRecipient = '';
+      this.load(twin.id);
+      await this.loadCases();
+    } catch (err: unknown) {
+      this.actionError.set(this.messageFrom(err, 'No se pudo completar la acción.'));
+    } finally {
+      this.acting.set(false);
+    }
+  }
+
+  private messageFrom(err: unknown, fallback: string): string {
+    const message = (err as { error?: { message?: unknown } })?.error?.message;
+    if (Array.isArray(message)) {
+      return message.join(' ');
+    }
+    return typeof message === 'string' ? message : fallback;
   }
 }
