@@ -39,11 +39,13 @@ Al arrancar se siembran los tipos de actividad, las operaciones y el usuario sta
 
 ## Semilla de desarrollo
 
-Con `DEMO_SEED=true` en `backend/.env`, al arrancar se crea (una sola vez, de forma idempotente) una cadena de café realista con cuatro organizaciones ya aprobadas, sus productos/lotes, el historial del libro de eventos con fechas retroactivas (varias semanas atrás) y un advisory con acuses. Sirve para probar todo el flujo sin registrar nada.
+Con `DEMO_SEED=true` en `backend/.env`, al arrancar se crea (una sola vez, de forma idempotente) una cadena **farmacéutica** con tres organizaciones ya aprobadas, sus productos/lotes, **casos rastreables** (cada caso es un EPC) y el historial del libro de eventos con fechas retroactivas, además de un retiro con acuses. Sirve para probar todo el flujo sin registrar nada.
 
-Los identificadores (productos, lotes, EPC y aviso) son **deterministas**, por lo que los deep-links de la UI y los ejemplos de esta guía funcionan en cualquier siembra.
+> En esta demo los **pallets no son rastreables**: son unidades logísticas que agrupan casos y no se serializan, así que no tienen EPC ni historial. La unidad trazable es la **caja (case)**.
 
-> El seed hace *skip* si ya existe (detecta los actores/emails de prueba). Para re-siembrar desde cero, borra los datos de la semilla (o la base) y reinicia.
+Los identificadores de productos, lotes, EPC y aviso son **deterministas**, por lo que los deep-links de la UI y los ejemplos de esta guía funcionan en cualquier siembra.
+
+> El seed hace *skip* si ya existe (detecta usuarios `@demo.nodoo.local`). Si vienes de una siembra anterior (p. ej. la demo de café), ejecuta `pnpm db:reset` y vuelve a arrancar para recrear la base con la cadena farmacéutica.
 
 ### Cuentas de prueba
 
@@ -51,14 +53,21 @@ Todas con contraseña **`Demo1234`**:
 
 | Organización | Rol (actividad) | Email |
 | --- | --- | --- |
-| Finca El Roble | `supplier` (productor) | `finca@demo.nodoo.local` |
-| Tostaduría Aroma | `manufacturer` | `tostaduria@demo.nodoo.local` |
-| Distribuciones Andina | `wholesaler` | `distribuciones@demo.nodoo.local` |
-| Cafeterías La Vela | `retailer` | `caferias@demo.nodoo.local` |
+| Laboratorios FarmaSur | `manufacturer` | `laboratorio@demo.nodoo.local` |
+| Distribuidora MediAndes | `wholesaler` | `distribuidora@demo.nodoo.local` |
+| Hospital San Rafael | `retailer` | `hospital@demo.nodoo.local` |
 
 ### Historia sembrada
 
-El proveedor comisiona 3 sacos de café verde (`GRN-2026-1117`), envía y factura cada uno a la tostadería, que los transforma en 2 paquetes tostados (`RST-2026-1117-A`), los envía/factura al mayorista, y el mayorista reenvía uno al minorista. Queda un advisory del lote tostado con 2 acuses (mayorista y minorista). Los 3 sacos verdes están `consumed`; los 2 paquetes tostados, `active`.
+El laboratorio comisiona 3 cajas de vacuna (`LOTE-VAC-2026-1117-A`) y 2 cajas de insulina (`LOTE-INS-2026-1117-B`), las envía y factura a la distribuidora, que las recibe. Luego la distribuidora envía/factura una caja de vacuna al hospital (recibida) y una caja de insulina que queda `in_transit` (aún sin recibir). Queda un **retiro** del lote de vacuna con 2 acuses (distribuidora y hospital). Los pallets asociados no se serializan.
+
+EPCs de ejemplo (cajas):
+
+- Vacuna en el hospital: `urn:nodoo:epc:1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d`
+- Vacuna en la distribuidora: `urn:nodoo:epc:2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e`
+- Insulina en tránsito: `urn:nodoo:epc:4d5e6f7a-8b9c-4d0e-1f2a-3b4c5d6e7f8a`
+
+Aviso de ejemplo: `7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a54`.
 
 ### Prueba rápida (curl)
 
@@ -66,21 +75,25 @@ El proveedor comisiona 3 sacos de café verde (`GRN-2026-1117`), envía y factur
 # 1) Login (devuelve accessToken + user)
 TOKEN=$(curl -s -X POST http://localhost:3001/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"caferias@demo.nodoo.local","password":"Demo1234"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
+  -d '{"email":"hospital@demo.nodoo.local","password":"Demo1234"}' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
 
-# 2) Gemelo digital de un EPC (el minorista posee uno tostado)
-EPD='urn:nodoo:epc:d71dd322-2b92-4a06-a4eb-8a1b43efecc0'
+# 2) Casos visibles para mi organización
+curl -s http://localhost:3001/api/v1/epcs -H "Authorization: Bearer $TOKEN"
+
+# 3) Gemelo digital e historial de una caja
+EPD='urn:nodoo:epc:1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
 curl -s http://localhost:3001/api/v1/epcs/$EPD -H "Authorization: Bearer $TOKEN"
-
-# 3) Historial / trazabilidad (orden cronológico, ventana de custodia)
 curl -s http://localhost:3001/api/v1/epcs/$EPD/history -H "Authorization: Bearer $TOKEN"
 
-# 4) Avisos que puedo ver (por producto)
-curl -s http://localhost:3001/api/v1/products/6b76c49e-de79-45ea-9e84-78bb737d4453/notices \
+# 4) Aviso
+curl -s http://localhost:3001/api/v1/notices/7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a54 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Otros EPCs de ejemplo: tostado en poder del mayorista `urn:nodoo:epc:7833feff-792d-4be1-bfa7-e376505c9a9d`; sacos verdes (consumidos, custodiados por la tostadería) `urn:nodoo:epc:236af542-6576-4e2f-987f-5239e1f3c3fe`. Aviso de ejemplo: `9fe65a02-0b8c-4a02-8afc-726d0ed00c8a`.
+### Registro en modo demo
+
+`POST /auth/register` requiere `activityCodes` (consulta `GET /activity-types`). En modo demo el actor se aprueba y el owner queda activo al instante, para que puedas entrar sin verificar el correo. Fuera de demo se mantiene el flujo de verificación por email y aprobación.
 
 ## Variables de entorno
 
@@ -104,9 +117,10 @@ Otros EPCs de ejemplo: tostado en poder del mayorista `urn:nodoo:epc:7833feff-79
 
 ## Endpoints principales
 
-- `POST /auth/register`, `POST /auth/login`
+- `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
+- `GET /activity-types`
 - `POST/GET /products`, `GET /products/:productId`, `POST/GET /products/:productId/batches`
-- `POST /epcs`, `POST /epcs/:epc/{receive,ship,invoice,aggregate,disaggregate}`, `POST /epcs/transform`
+- `POST /epcs`, `GET /epcs`, `POST /epcs/:epc/{receive,ship,invoice,aggregate,disaggregate}`, `POST /epcs/transform`
 - `GET /epcs/:epc`, `GET /epcs/:epc/history`
 - `POST/GET /products/:productId/notices`
 - `GET /notices/:noticeId`, `POST /notices/:noticeId/ack`, `GET /notices/:noticeId/acks`

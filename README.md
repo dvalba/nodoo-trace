@@ -25,6 +25,18 @@ pnpm start      # levanta PostgreSQL + API (:3001) + frontend (:4200)
 
 La API usa el puerto `3001` y PostgreSQL el `5434` por defecto, para evitar choques con otros servicios; se cambian en `backend/.env`. La cadena demo se siembra por defecto (`DEMO_SEED=true`); pon `DEMO_SEED=false` en `backend/.env` si no la quieres.
 
+## Demo
+
+La semilla crea una cadena farmacéutica con tres organizaciones aprobadas, casos rastreables y un retiro con acuses (los pallets no se serializan). Todas las cuentas usan la contraseña `Demo1234`:
+
+| Organización | Rol | Email |
+| --- | --- | --- |
+| Laboratorios FarmaSur | Fabricante | `laboratorio@demo.nodoo.local` |
+| Distribuidora MediAndes | Mayorista | `distribuidora@demo.nodoo.local` |
+| Hospital San Rafael | Minorista | `hospital@demo.nodoo.local` |
+
+Detalle de la historia, EPCs de ejemplo y prueba con `curl` en [backend/README.md](backend/README.md#semilla-de-desarrollo). Si ya tenías una base con una demo anterior, ejecuta `pnpm db:reset` y vuelve a arrancar.
+
 Otros scripts de la raíz: `pnpm dev:backend`, `pnpm dev:frontend`, `pnpm db:up`,
 `pnpm db:down`, `pnpm db:reset`, `pnpm build`, `pnpm lint`, `pnpm test`.
 

@@ -5,9 +5,11 @@ Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
 
 ## 1. Un owner registra su organización
 
-1. Llama a `POST /auth/register` con los datos de la organización
-   (`legalName`, `organizationNumber`) y de su cuenta
-   (`adminEmail`, `adminPassword`, `adminFullName`).
+1. Consulta `GET /activity-types` y llama a `POST /auth/register` con los
+   datos de la organización (`name`, `organizationNumber`), de su cuenta
+   (`email`, `password`, `fullName`) y los tipos de actividad elegidos
+   (`activityCodes`). Las actividades se asignan en el registro, así que la
+   organización puede operar en cuanto esté aprobada.
 2. La organización queda creada en estado `PENDING_APPROVAL` y su cuenta
    como `EMAIL_UNVERIFIED`; se genera un email de verificación a su nombre
    (hoy se escribe a un archivo local, no se envía por SMTP).
@@ -17,8 +19,8 @@ Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
 4. El staff de la plataforma aprueba la organización
    (`PATCH /admin/actors/:id/approval`): el actor pasa a `APPROVED` y todos
    sus usuarios en `AWAITING_APPROVAL` se activan.
-5. Ya puede loguearse con `POST /auth/login` (devuelve un JWT) y completar el
-   onboarding de su organización (solo una vez):
+5. Ya puede loguearse con `POST /auth/login` (devuelve un JWT) y usar el
+   frontend. Si necesita cambiar sus actividades puede usar el onboarding:
    - `GET /actor/operations`: catálogo de operaciones agrupadas
      (producción, movimiento, almacenaje, comercio, transformación,
      asociaciones).
@@ -28,6 +30,9 @@ Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
      validan que cubren todas las operaciones marcadas.
    - `POST /actor/operations/custom`: alternativa para crear un tipo de
      actividad propio con exactamente las operaciones que necesita.
+
+> En modo demo (`DEMO_SEED=true`), el registro aprueba la organización y deja
+> la cuenta `ACTIVE` al instante para probar sin verificar el correo.
 
 ## 2. El staff de la plataforma
 
@@ -76,6 +81,8 @@ actividad correspondiente asignada en el onboarding):
 
 Consulta:
 
+- `GET /epcs` lista los EPCs visibles para la organización (productor,
+  propietario o custodio), con filtros opcionales `productId` y `batchId`.
 - `GET /epcs/:epc` devuelve el gemelo digital actual (producto, lote,
   productor, propietario, custodio).
 - `GET /epcs/:epc/history` devuelve los eventos en orden cronológico, filtrados
@@ -109,11 +116,8 @@ Avisos (recall / advisory):
 
 Bloqueantes para el MVP:
 
-- No hay frontend: todo lo anterior solo existe como API (Swagger).
 - No puede reenviar el email de verificación de su registro (el register lo
   menciona, pero el endpoint no existe).
-- No puede listar "mis EPCs": solo puede consultar un EPC conociendo su
-  identificador.
 - No puede gestionar a sus miembros (no hay endpoints para listar, cambiar rol
   o dar de baja usuarios de su organización).
 - Los correos no se envían de verdad: el emisor escribe un archivo local.
