@@ -4,7 +4,7 @@ import { Auth } from '../../auth/decorators/auth.decorator.js';
 import { ActorService } from '../actor.service.js';
 
 @ApiTags('actor')
-@Controller('actor')
+@Controller('actors')
 export class ActorController {
   constructor(private readonly actorService: ActorService) {}
 
