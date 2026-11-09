@@ -6,13 +6,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ActorStatus } from './enums/actor-status.enum.js';
 import { throwNotFound } from '../common/helpers/crud-exceptions.helper.js';
 import type { ActivityType } from '../activity-types/entities/activity-type.entity.js';
-import { ActivityTypesService } from '../activity-types/activity-types.service.js';
 
 @Injectable()
 export class ActorService {
   constructor(
     @InjectRepository(Actor) private readonly actorRepo: Repository<Actor>,
-    private readonly activityTypesService: ActivityTypesService,
   ) {}
 
   async findByEmailInActor(email: string, actorId: string) {
@@ -27,20 +25,27 @@ export class ActorService {
   }
 
   async findByIdWithActivities(id: string) {
-    return this.actorRepo.findOne({ where: { id }, relations: { activities: true } });
+    return this.actorRepo.findOne({
+      where: { id },
+      relations: { activities: { operations: true } },
+    });
   }
 
   async getReference(id: string) {
     const actor = await this.findByIdWithActivities(id);
     if (!actor) throwNotFound('Actor', id);
 
+    const activities = (actor.activities ?? []) as ActivityType[];
+
     return {
       id: actor.id,
       name: actor.name,
-      activities: (actor.activities ?? []).map((a) => ({
-        code: (a as ActivityType).code,
-        name: (a as ActivityType).name,
-      })),
+      activities: activities.map((a) => ({ code: a.code, name: a.name })),
+      operations: [
+        ...new Set(
+          activities.flatMap((a) => (a.operations ?? []).map((o) => o.code)),
+        ),
+      ],
     };
   }
   async findByIdOrFail(id: string): Promise<Actor> {
@@ -64,24 +69,17 @@ export class ActorService {
   }
 
   async createActor(
-    dto: CreateActorDto & { activityCodes?: string[] },
+    dto: CreateActorDto,
     queryRunner?: QueryRunner,
   ): Promise<Actor> {
     const manager = queryRunner ? queryRunner.manager : this.actorRepo.manager;
-    const { legalName, organizationNumber, activityCodes } = dto;
-
-    const activities =
-      activityCodes && activityCodes.length > 0
-        ? await this.activityTypesService.findWithOperationsByCodes(
-            activityCodes,
-          )
-        : [];
+    const { legalName, organizationNumber } = dto;
 
     const actor = manager.create(Actor, {
       name: legalName,
       organizationNumber,
       status: ActorStatus.PENDING_APPROVAL,
-      activities,
+      activities: [],
     });
 
     return manager.save(actor);

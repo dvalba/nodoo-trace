@@ -2,15 +2,20 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, type Observable } from 'rxjs';
 import type {
+  AcceptActivitiesPayload,
+  AcceptActivitiesResponse,
   ActivityType,
   ActorRef,
   Batch,
   CreateNoticePayload,
+  CustomActivityResponse,
   Epc,
   EpcHistoryEntry,
   MeResponse,
   Notice,
   NoticeAck,
+  Operation,
+  OperationSuggestion,
   Product,
 } from './models';
 
@@ -26,6 +31,42 @@ export class Api {
 
   listActivityTypes(): Promise<ActivityType[]> {
     return this.req(this.http.get<ActivityType[]>(`${BASE}/activity-types`));
+  }
+
+  listOperations(): Promise<Operation[]> {
+    return this.req(this.http.get<Operation[]>(`${BASE}/actor/operations`));
+  }
+
+  suggestOperations(operations: string[]): Promise<OperationSuggestion[]> {
+    return this.req(
+      this.http.post<OperationSuggestion[]>(
+        `${BASE}/actor/operations/suggestions`,
+        { operations },
+      ),
+    );
+  }
+
+  acceptActivities(
+    payload: AcceptActivitiesPayload,
+  ): Promise<AcceptActivitiesResponse> {
+    return this.req(
+      this.http.post<AcceptActivitiesResponse>(
+        `${BASE}/actor/operations/accept`,
+        payload,
+      ),
+    );
+  }
+
+  createCustomActivity(payload: {
+    name: string;
+    operations: string[];
+  }): Promise<CustomActivityResponse> {
+    return this.req(
+      this.http.post<CustomActivityResponse>(
+        `${BASE}/actor/operations/custom`,
+        payload,
+      ),
+    );
   }
 
   listProducts(): Promise<Product[]> {
@@ -124,7 +165,7 @@ export class Api {
   }
 
   getActor(actorId: string): Promise<ActorRef> {
-    return this.req(this.http.get<ActorRef>(`${BASE}/actor/${actorId}`));
+    return this.req(this.http.get<ActorRef>(`${BASE}/actors/${actorId}`));
   }
 
   private req<T>(obs: Observable<T>): Promise<T> {

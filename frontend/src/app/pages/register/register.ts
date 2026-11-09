@@ -1,22 +1,36 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Api } from '../../core/api.service';
 import { Auth } from '../../core/auth.service';
-import type { ActivityType } from '../../core/models';
 
 @Component({
   selector: 'app-register',
   imports: [FormsModule, RouterLink],
   template: `
     <div class="min-h-screen flex items-center justify-center p-6">
-      <div class="w-full max-w-lg">
+      <div class="w-full max-w-xl">
         <div class="text-2xl font-semibold tracking-tight mb-1">NodooTrace</div>
         <p class="text-mut text-sm mb-6">
-          Registra tu organización y crea la cuenta del propietario.
+          Crea la cuenta de tu organización. En el siguiente paso configurarás
+          qué operaciones hace tu empresa.
         </p>
 
-        <form (ngSubmit)="submit()" class="space-y-4">
+        <ol class="steps mb-6">
+          <li class="done">
+            <span class="num">1</span>
+            <span>Crea tu cuenta</span>
+          </li>
+          <li>
+            <span class="num">2</span>
+            <span>Configura tus operaciones</span>
+          </li>
+          <li>
+            <span class="num">3</span>
+            <span>Empieza a trazar</span>
+          </li>
+        </ol>
+
+        <form (ngSubmit)="submit()" class="card space-y-4">
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="block text-sm mb-1" for="legalName">Organización</label>
@@ -40,31 +54,6 @@ import type { ActivityType } from '../../core/models';
                 placeholder="901020301"
               />
             </div>
-          </div>
-
-          <div>
-            <div class="text-sm mb-2">¿Qué hace tu organización?</div>
-            @if (loadingActivities()) {
-              <p class="text-sm text-mut">Cargando actividades…</p>
-            } @else {
-              <div class="grid gap-2 sm:grid-cols-2">
-                @for (activity of activities(); track activity.code) {
-                  <label class="activity">
-                    <input
-                      type="checkbox"
-                      [checked]="selected().has(activity.code)"
-                      (change)="toggle(activity.code)"
-                    />
-                    <span>
-                      <span class="block text-sm">{{ activity.name }}</span>
-                      <span class="block text-xs text-mut">
-                        {{ activity.description }}
-                      </span>
-                    </span>
-                  </label>
-                }
-              </div>
-            }
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
@@ -103,17 +92,26 @@ import type { ActivityType } from '../../core/models';
               type="password"
               autocomplete="new-password"
               class="field"
-              placeholder="Mín. 8, una mayúscula, una minúscula y un número"
+              placeholder="Mín. 8 caracteres, una mayúscula y un número"
             />
+            <p class="hint">
+              Debe tener al menos 8 caracteres, una mayúscula, una minúscula y un
+              número.
+            </p>
           </div>
 
           @if (error()) {
-            <div class="text-sm" style="color: #f08a8a">{{ error() }}</div>
+            <div class="alert-error">{{ error() }}</div>
           }
 
           <button type="submit" [disabled]="busy()" class="btn-primary w-full">
             {{ busy() ? 'Creando organización…' : 'Crear organización' }}
           </button>
+
+          <p class="hint text-center">
+            No pedimos actividades aquí: las eliges después según lo que hace tu
+            empresa.
+          </p>
         </form>
 
         <p class="text-sm text-mut mt-6 text-center">
@@ -124,9 +122,16 @@ import type { ActivityType } from '../../core/models';
     </div>
   `,
   styles: `
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
+    }
     .field {
       width: 100%;
-      padding: 0.5rem 0.75rem;
+      padding: 0.55rem 0.75rem;
       border-radius: 0.5rem;
       border: 1px solid var(--color-border);
       background: var(--color-surface);
@@ -134,11 +139,16 @@ import type { ActivityType } from '../../core/models';
       font-size: 0.875rem;
     }
     .field:focus {
-      outline: none;
+      outline: 2px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
       border-color: var(--color-accent);
     }
+    .hint {
+      font-size: 0.75rem;
+      color: var(--color-mut);
+      margin-top: 0.35rem;
+    }
     .btn-primary {
-      padding: 0.55rem 0.75rem;
+      padding: 0.6rem 0.75rem;
       border-radius: 0.5rem;
       background: var(--color-accent);
       color: var(--color-accent-ink);
@@ -149,22 +159,13 @@ import type { ActivityType } from '../../core/models';
       opacity: 0.6;
       cursor: not-allowed;
     }
-    .activity {
-      display: flex;
-      gap: 0.6rem;
-      align-items: flex-start;
-      padding: 0.55rem 0.7rem;
+    .alert-error {
+      padding: 0.55rem 0.75rem;
       border-radius: 0.5rem;
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
-      cursor: pointer;
-    }
-    .activity:hover {
-      border-color: var(--color-accent);
-    }
-    .activity input {
-      margin-top: 0.15rem;
-      accent-color: var(--color-accent);
+      border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+      background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+      color: var(--color-danger);
+      font-size: 0.875rem;
     }
     .link {
       color: var(--color-accent);
@@ -173,10 +174,44 @@ import type { ActivityType } from '../../core/models';
     .link:hover {
       text-decoration: underline;
     }
+    .steps {
+      display: flex;
+      gap: 0.5rem;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .steps li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+      font-size: 0.75rem;
+      color: var(--color-mut);
+    }
+    .steps .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 9999px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      font-weight: 700;
+      flex: none;
+    }
+    .steps li.done .num {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-accent-ink);
+    }
+    .steps li.done {
+      color: var(--color-ink);
+    }
   `,
 })
 export class Register implements OnInit {
-  private readonly api = inject(Api);
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
 
@@ -186,33 +221,13 @@ export class Register implements OnInit {
   adminEmail = '';
   adminPassword = '';
 
-  readonly activities = signal<ActivityType[]>([]);
-  readonly loadingActivities = signal(true);
-  readonly selected = signal<ReadonlySet<string>>(new Set());
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
     if (this.auth.isAuthenticated()) {
       void this.router.navigate(['/']);
-      return;
     }
-
-    this.api
-      .listActivityTypes()
-      .then((activities) => this.activities.set(activities))
-      .catch(() => this.error.set('No se pudieron cargar las actividades.'))
-      .finally(() => this.loadingActivities.set(false));
-  }
-
-  toggle(code: string): void {
-    const next = new Set(this.selected());
-    if (next.has(code)) {
-      next.delete(code);
-    } else {
-      next.add(code);
-    }
-    this.selected.set(next);
   }
 
   submit(): void {
@@ -222,51 +237,30 @@ export class Register implements OnInit {
       this.error.set('Completa el nombre de la organización y del propietario.');
       return;
     }
-    if (this.selected().size === 0) {
-      this.error.set('Selecciona al menos una actividad.');
-      return;
-    }
-    if (!this.adminEmail.trim()) {
-      this.error.set('Ingresa el correo del propietario.');
-      return;
-    }
-    if (
-      this.adminPassword.length < 8 ||
-      !/[a-z]/.test(this.adminPassword) ||
-      !/[A-Z]/.test(this.adminPassword) ||
-      !/\d/.test(this.adminPassword)
-    ) {
-      this.error.set(
-        'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.',
-      );
+    if (!this.adminEmail.trim() || !this.adminPassword) {
+      this.error.set('Ingresa el correo y la contraseña del propietario.');
       return;
     }
 
     this.busy.set(true);
-    const email = this.adminEmail.trim();
 
     this.auth
       .register({
         legalName: this.legalName.trim(),
         organizationNumber: this.organizationNumber.trim() || undefined,
-        activityCodes: [...this.selected()],
         adminFullName: this.adminFullName.trim(),
-        adminEmail: email,
+        adminEmail: this.adminEmail.trim(),
         adminPassword: this.adminPassword,
       })
-      .then((result) => {
-        if (result.demoMode) {
-          return this.auth
-            .login(email, this.adminPassword)
-            .then(() => void this.router.navigate(['/']));
-        }
-        return this.router.navigate(['/login'], {
-          queryParams: { registered: '1' },
-        });
-      })
-      .catch((err: unknown) => {
-        this.error.set(this.messageFrom(err));
-      })
+      .then((response) =>
+        this.router.navigate(['/login'], {
+          queryParams: {
+            registered: '1',
+            demo: response.demoMode ? '1' : null,
+          },
+        }),
+      )
+      .catch((err: unknown) => this.error.set(this.messageFrom(err)))
       .finally(() => this.busy.set(false));
   }
 
@@ -275,9 +269,8 @@ export class Register implements OnInit {
     if (Array.isArray(message)) {
       return message.join(' ');
     }
-    if (typeof message === 'string') {
-      return message;
-    }
-    return 'No se pudo registrar la organización.';
+    return typeof message === 'string'
+      ? message
+      : 'No se pudo crear la organización.';
   }
 }

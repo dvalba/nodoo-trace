@@ -1,14 +1,17 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-bg: #0b0f17;
-  --color-surface: #111826;
-  --color-surface-2: #17202f;
-  --color-border: #243044;
-  --color-ink: #e6ecf5;
-  --color-mut: #8a97ad;
-  --color-accent: #e0a458;
-  --color-accent-ink: #211405;
+  --color-bg: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f4f9;
+  --color-border: #dfe5ee;
+  --color-ink: #172033;
+  --color-mut: #5f6f89;
+  --color-accent: #2456d6;
+  --color-accent-ink: #ffffff;
+  --color-success: #127a4b;
+  --color-danger: #b42318;
+  --color-warning: #8a5a00;
 }
 
 html,
@@ -23,27 +26,24 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
-}
-
-a[routerlink] {
-  display: block;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-mut);
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-a[routerlink]:hover {
-  background: var(--color-surface-2);
-  color: var(--color-ink);
-}
-
-a[routerlink].active {
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
 }

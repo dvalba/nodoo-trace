@@ -35,10 +35,37 @@ export interface ActivityType {
 export interface RegisterActorPayload {
   legalName: string;
   organizationNumber?: string;
-  activityCodes: string[];
   adminFullName: string;
   adminEmail: string;
   adminPassword: string;
+}
+
+export interface Operation {
+  code: string;
+  label: string;
+  group: string;
+  sortOrder: number;
+}
+
+export interface OperationSuggestion {
+  activities: ActivityRef[];
+  covered: string[];
+  extras: string[];
+}
+
+export interface AcceptActivitiesPayload {
+  activityCodes: string[];
+  operations: string[];
+}
+
+export interface AcceptActivitiesResponse {
+  actorId: string;
+  activities: ActivityRef[];
+}
+
+export interface CustomActivityResponse {
+  actorId: string;
+  activity: ActivityRef;
 }
 
 export interface RegisterResponse {
@@ -59,6 +86,7 @@ export interface ActorRef {
   id: string;
   name: string;
   activities: ActivityRef[];
+  operations?: string[];
 }
 
 export interface MeResponse {

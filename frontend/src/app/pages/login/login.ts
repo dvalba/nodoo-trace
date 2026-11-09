@@ -39,10 +39,10 @@ import { Auth } from '../../core/auth.service';
           </div>
 
           @if (notice()) {
-            <div class="text-sm" style="color: #5ec88a">{{ notice() }}</div>
+            <div class="alert-success">{{ notice() }}</div>
           }
           @if (error()) {
-            <div class="text-sm" style="color: #f08a8a">{{ error() }}</div>
+            <div class="alert-error">{{ error() }}</div>
           }
 
           <button type="submit" [disabled]="busy()" class="btn-primary w-full">
@@ -84,6 +84,22 @@ import { Auth } from '../../core/auth.service';
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .alert-success,
+    .alert-error {
+      padding: 0.55rem 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+    }
+    .alert-success {
+      border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+      background: color-mix(in srgb, var(--color-success) 8%, transparent);
+      color: var(--color-success);
+    }
+    .alert-error {
+      border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+      background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+      color: var(--color-danger);
+    }
     .link {
       color: var(--color-accent);
       text-decoration: none;
@@ -110,8 +126,11 @@ export class Login implements OnInit {
       return;
     }
     if (this.route.snapshot.queryParamMap.get('registered') === '1') {
+      const demo = this.route.snapshot.queryParamMap.get('demo') === '1';
       this.notice.set(
-        'Organización creada. Revisa tu correo para verificar la cuenta.',
+        demo
+          ? 'Organización creada y activada. Inicia sesión para configurar qué operaciones hace tu empresa.'
+          : 'Organización creada. Revisa tu correo para verificar la cuenta y luego inicia sesión.',
       );
     }
   }

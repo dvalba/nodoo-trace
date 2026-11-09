@@ -87,9 +87,9 @@ export class AuthService {
         emailSent,
         demoMode,
         message: demoMode
-          ? 'Organización creada y activada en modo demo. Ya puedes iniciar sesión.'
+          ? 'Organización creada y activada en modo demo. Inicia sesión y configura qué operaciones hace tu empresa.'
           : emailSent
-            ? 'Registration successful. Check your email to verify your account.'
+            ? 'Registration successful. Verify your email, then sign in and configure your operations.'
             : 'Registration successful, but we could not send the verification email. Please use the resend endpoint.',
       };
     } catch (error) {
@@ -206,10 +206,16 @@ export class AuthService {
         ? {
             id: actor.id,
             name: actor.name,
-            activities: (actor.activities ?? []).map((a) => ({
-              code: (a as ActivityType).code,
-              name: (a as ActivityType).name,
-            })),
+            activities: ((actor.activities ?? []) as ActivityType[]).map(
+              (a) => ({ code: a.code, name: a.name }),
+            ),
+            operations: [
+              ...new Set(
+                ((actor.activities ?? []) as ActivityType[]).flatMap((a) =>
+                  (a.operations ?? []).map((o) => o.code),
+                ),
+              ),
+            ],
           }
         : null,
     };

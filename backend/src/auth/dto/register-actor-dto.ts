@@ -1,6 +1,4 @@
 import {
-  ArrayNotEmpty,
-  IsArray,
   IsEmail,
   IsString,
   MinLength,
@@ -12,16 +10,8 @@ import { CreateActorDto } from '../../actor/dto/create-actor.dto.js';
 
 export class RegisterActorDto extends CreateActorDto {
   // Hereda: legalName, organizationNumber
-
-  @ApiProperty({
-    description: 'Activity types the organization performs',
-    type: [String],
-    example: ['manufacturer'],
-  })
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  activityCodes: string[];
+  // Las actividades no se piden aquí: el owner las define en el onboarding
+  // de operaciones (sugerencias o actividad propia) después de aprobarse.
 
   @ApiProperty({ description: 'Owner account email', example: 'owner@acme.com' })
   @IsEmail({}, { message: 'email must be a valid email address' })
