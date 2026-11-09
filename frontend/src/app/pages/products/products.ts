@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../../core/api.service';
+import { Auth } from '../../core/auth.service';
 import type { Batch, Product } from '../../core/models';
 
 interface ProductWithBatches {
@@ -21,14 +22,16 @@ interface CreatedCase {
   template: `
     <div class="space-y-6">
       <div>
-        <h1 class="text-xl font-semibold tracking-tight">Productos</h1>
+        <h1 class="text-xl font-semibold tracking-tight">Productos y casos</h1>
         <p class="text-sm text-mut mt-1">
-          Catálogo, lotes y casos rastreables de tu organización.
+          Un producto agrupa lotes y cada lote agrupa casos. El caso (una caja
+          con EPC) es la unidad que se mueve y se rastrea; los pallets no se
+          serializan.
         </p>
       </div>
 
       <section class="card">
-        <h2 class="text-sm font-semibold mb-3">Nuevo producto</h2>
+        <h2 class="text-sm font-semibold mb-3">Paso 1 · Crea un producto</h2>
         <form (ngSubmit)="createProduct()" class="grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end">
           <div>
             <label class="block text-sm mb-1" for="sku">SKU</label>
@@ -55,7 +58,7 @@ interface CreatedCase {
           </button>
         </form>
         @if (productError()) {
-          <div class="text-sm mt-3" style="color: #f08a8a">{{ productError() }}</div>
+          <div class="text-sm mt-3" style="color: var(--color-danger)">{{ productError() }}</div>
         }
       </section>
 
@@ -95,7 +98,7 @@ interface CreatedCase {
 
               <div class="mt-4 grid gap-4 border-t border-border pt-3 lg:grid-cols-2">
                 <div>
-                  <div class="text-xs uppercase tracking-wide text-mut mb-2">Nuevo lote</div>
+                  <div class="text-xs uppercase tracking-wide text-mut mb-2">Paso 2 · Añade un lote</div>
                   <div class="flex gap-2">
                     <input
                       [(ngModel)]="batchCodes[row.product.id]"
@@ -113,7 +116,7 @@ interface CreatedCase {
                     </button>
                   </div>
                   @if (batchError()[row.product.id]) {
-                    <div class="text-xs mt-2" style="color: #f08a8a">
+                    <div class="text-xs mt-2" style="color: var(--color-danger)">
                       {{ batchError()[row.product.id] }}
                     </div>
                   }
@@ -121,9 +124,15 @@ interface CreatedCase {
 
                 <div>
                   <div class="text-xs uppercase tracking-wide text-mut mb-2">
-                    Generar casos rastreables
+                    Paso 3 · Genera casos (cajas)
                   </div>
-                  @if (row.batches.length === 0) {
+                  @if (!canCommission()) {
+                    <p class="text-xs text-mut">
+                      Tu actividad no incluye crear identidades de producto
+                      (comisionar). Puedes preparar catálogo y lotes, pero no
+                      generar casos.
+                    </p>
+                  } @else if (row.batches.length === 0) {
                     <p class="text-xs text-mut">Crea un lote para poder generar casos.</p>
                   } @else {
                     <div class="flex flex-wrap gap-2">
@@ -162,7 +171,7 @@ interface CreatedCase {
       }
 
       @if (caseError()) {
-        <div class="text-sm" style="color: #f08a8a">{{ caseError() }}</div>
+        <div class="text-sm" style="color: var(--color-danger)">{{ caseError() }}</div>
       }
 
       @if (createdCases().length > 0) {
@@ -261,8 +270,10 @@ interface CreatedCase {
 })
 export class Products implements OnInit {
   private readonly api = inject(Api);
+  private readonly auth = inject(Auth);
   private readonly router = inject(Router);
 
+  readonly myOperations = signal<ReadonlySet<string>>(new Set());
   readonly loading = signal(true);
   readonly rows = signal<ProductWithBatches[]>([]);
 
@@ -282,7 +293,17 @@ export class Products implements OnInit {
   readonly createdCases = signal<CreatedCase[]>([]);
 
   ngOnInit(): void {
+    this.auth
+      .me()
+      .then((me) =>
+        this.myOperations.set(new Set(me.actor?.operations ?? [])),
+      )
+      .catch(() => this.myOperations.set(new Set()));
     void this.load();
+  }
+
+  canCommission(): boolean {
+    return this.myOperations().has('object:commissioning');
   }
 
   createProduct(): void {

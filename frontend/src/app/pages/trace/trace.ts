@@ -22,12 +22,12 @@ import type {
 } from '../../core/models';
 
 const STATUS_STYLES: Record<EpcStatus, string> = {
-  active: '#5ec88a',
-  in_transit: '#6aa9e8',
-  in_progress: '#e0b458',
-  consumed: '#8a97ad',
-  damaged: '#f08a8a',
-  expired: '#c98ad6',
+  active: '#0f7a4f',
+  in_transit: '#1d5fbf',
+  in_progress: '#8a5a00',
+  consumed: '#5f6f89',
+  damaged: '#b42318',
+  expired: '#7a3e9d',
 };
 
 const TYPE_LABELS: Record<EventType, string> = {
@@ -82,8 +82,9 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
       <div>
         <h1 class="text-xl font-semibold tracking-tight">Trazabilidad</h1>
         <p class="text-sm text-mut mt-1">
-          Consulta un caso por su EPC para ver su gemelo digital, el historial
-          completo y sus avisos vinculados.
+          Un caso es la caja que quieres rastrear. Consulta su estado, su
+          historial completo y los avisos que le afectan. Si no sabes el EPC,
+          elígelo en «Mis casos».
         </p>
       </div>
 
@@ -110,7 +111,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
         </div>
 
         @if (error()) {
-          <div class="mt-3 text-sm" style="color: #f08a8a">{{ error() }}</div>
+          <div class="mt-3 text-sm" style="color: var(--color-danger)">{{ error() }}</div>
         }
       </div>
 
@@ -127,7 +128,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
             @for (item of myCases(); track item.id) {
               <button type="button" class="case-row" (click)="load(item.id)">
                 <span class="flex items-center gap-2">
-                  <span class="badge" [style.background]="statusColor(item.status)" [style.color]="'#0b0f17'">
+                  <span class="badge" [style.background]="statusColor(item.status)" style="color: #fff">
                     {{ statusLabel(item.status) }}
                   </span>
                   <span class="font-mono text-xs">{{ short(item.id) }}</span>
@@ -154,7 +155,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                 <span
                   class="badge"
                   [style.background]="statusColor(twin.status)"
-                  [style.color]="'#0b0f17'"
+                  style="color: #fff"
                 >
                   {{ statusLabel(twin.status) }}
                 </span>
@@ -199,7 +200,11 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
 
             @if (canShip() || canReceive() || canInvoice()) {
               <section class="card">
-                <h2 class="text-sm font-semibold mb-3">Acciones</h2>
+                <h2 class="text-sm font-semibold mb-1">Acciones disponibles</h2>
+                <p class="text-xs text-mut mb-3">
+                  Solo se muestran las acciones que tu actividad permite y que
+                  corresponden al estado actual del caso.
+                </p>
 
                 <div class="flex flex-wrap gap-2">
                   @if (canShip()) {
@@ -235,11 +240,20 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                 }
 
                 @if (actionError()) {
-                  <div class="text-sm mt-3" style="color: #f08a8a">{{ actionError() }}</div>
+                  <div class="text-sm mt-3" style="color: var(--color-danger)">{{ actionError() }}</div>
                 }
                 @if (actionMessage()) {
-                  <div class="text-sm mt-3" style="color: #5ec88a">{{ actionMessage() }}</div>
+                  <div class="text-sm mt-3" style="color: var(--color-success)">{{ actionMessage() }}</div>
                 }
+              </section>
+            } @else {
+              <section class="card">
+                <h2 class="text-sm font-semibold mb-1">Sin acciones para ti</h2>
+                <p class="text-xs text-mut">
+                  No puedes enviar, recibir ni facturar este caso en este
+                  momento. Puede ser por su estado o porque tu actividad no
+                  incluye esa operación.
+                </p>
               </section>
             }
 
@@ -291,7 +305,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                           <span
                             class="badge"
                             [style.background]="statusColor(entry.disposition)"
-                            [style.color]="'#0b0f17'"
+                            style="color: #fff"
                           >
                             {{ statusLabel(entry.disposition) }}
                           </span>
@@ -423,6 +437,7 @@ export class Trace implements OnInit, AfterViewChecked {
   readonly myCases = signal<Epc[]>([]);
 
   readonly myActorId = signal<string | null>(null);
+  readonly myOperations = signal<ReadonlySet<string>>(new Set());
   readonly acting = signal(false);
   readonly actionError = signal<string | null>(null);
   readonly actionMessage = signal<string | null>(null);
@@ -435,8 +450,14 @@ export class Trace implements OnInit, AfterViewChecked {
   ngOnInit(): void {
     this.auth
       .me()
-      .then((me) => this.myActorId.set(me.actor?.id ?? me.user.actorId))
-      .catch(() => this.myActorId.set(null));
+      .then((me) => {
+        this.myActorId.set(me.actor?.id ?? me.user.actorId);
+        this.myOperations.set(new Set(me.actor?.operations ?? []));
+      })
+      .catch(() => {
+        this.myActorId.set(null);
+        this.myOperations.set(new Set());
+      });
 
     void this.loadCases();
 
@@ -507,7 +528,12 @@ export class Trace implements OnInit, AfterViewChecked {
 
   canShip(): boolean {
     const twin = this.epc();
-    return !!twin && twin.status === 'active' && this.isCustodian(twin);
+    return (
+      !!twin &&
+      twin.status === 'active' &&
+      this.isCustodian(twin) &&
+      this.hasOperation('object:shipping')
+    );
   }
 
   canReceive(): boolean {
@@ -515,13 +541,20 @@ export class Trace implements OnInit, AfterViewChecked {
     return (
       !!twin &&
       twin.status === 'in_transit' &&
-      (this.isOwner(twin) || this.isCustodian(twin))
+      (this.isOwner(twin) || this.isCustodian(twin)) &&
+      this.hasOperation('object:receiving')
     );
   }
 
   canInvoice(): boolean {
     const twin = this.epc();
-    return !!twin && this.isOwner(twin);
+    return (
+      !!twin && this.isOwner(twin) && this.hasOperation('transaction:inv')
+    );
+  }
+
+  hasOperation(code: string): boolean {
+    return this.myOperations().has(code);
   }
 
   ship(): void {

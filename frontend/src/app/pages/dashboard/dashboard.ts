@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Auth } from '../../core/auth.service';
 import { Api } from '../../core/api.service';
+import { activityLabel } from '../../core/labels';
 import type { Epc, EpcStatus, MeResponse, Product } from '../../core/models';
 
 const STATUS_LABELS: Record<EpcStatus, string> = {
@@ -14,12 +15,12 @@ const STATUS_LABELS: Record<EpcStatus, string> = {
 };
 
 const STATUS_STYLES: Record<EpcStatus, string> = {
-  active: '#5ec88a',
-  in_transit: '#6aa9e8',
-  in_progress: '#e0b458',
-  consumed: '#8a97ad',
-  damaged: '#f08a8a',
-  expired: '#c98ad6',
+  active: '#0f7a4f',
+  in_transit: '#1d5fbf',
+  in_progress: '#8a5a00',
+  consumed: '#5f6f89',
+  damaged: '#b42318',
+  expired: '#7a3e9d',
 };
 
 @Component({
@@ -30,9 +31,17 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
       <div>
         <h1 class="text-xl font-semibold tracking-tight">Inicio</h1>
         <p class="text-sm text-mut mt-1">
-          Bienvenido de nuevo, {{ me()?.user?.fullName ?? '…' }}.
+          Bienvenido de nuevo, {{ me()?.user?.fullName ?? '…' }}. Este es el
+          estado de tu organización.
         </p>
       </div>
+
+      @if (onboarded()) {
+        <div class="alert-success">
+          Configuración completada. Ya puedes crear productos, generar casos y
+          moverlos.
+        </div>
+      }
 
       <div class="grid gap-4 md:grid-cols-3">
         <div class="card">
@@ -40,11 +49,8 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
           <div class="text-lg font-medium mt-1">
             {{ me()?.actor?.name ?? 'Sin vincular' }}
           </div>
-          @let actor = me()?.actor;
-          @if (actor) {
-            <div class="text-sm text-mut mt-1">
-              {{ actor.activities.map((a) => a.name).join(' · ') }}
-            </div>
+          @if (activityNames()) {
+            <div class="text-sm text-mut mt-1">{{ activityNames() }}</div>
           }
         </div>
         <div class="card">
@@ -58,6 +64,47 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
           <div class="text-sm text-mut mt-1">visibles para tu organización</div>
         </div>
       </div>
+
+      @if (products().length === 0 || cases().length === 0) {
+        <section class="card">
+          <h2 class="text-sm font-semibold">Primeros pasos</h2>
+          <p class="text-sm text-mut mt-1">
+            Completa estos pasos para empezar a trazar. Puedes volver a esta
+            lista cuando quieras.
+          </p>
+          <div class="onboarding-list">
+            <a routerLink="/products" class="onboarding-step" [class.done]="products().length > 0">
+              <span class="check">{{ products().length > 0 ? '✓' : '1' }}</span>
+              <span>
+                <span class="step-name">Crea tu primer producto y lote</span>
+                <span class="step-hint">
+                  El producto es el catálogo; el lote agrupa unidades fabricadas
+                  juntas.
+                </span>
+              </span>
+            </a>
+            <a routerLink="/products" class="onboarding-step" [class.done]="cases().length > 0">
+              <span class="check">{{ cases().length > 0 ? '✓' : '2' }}</span>
+              <span>
+                <span class="step-name">Genera tu primer caso (caja)</span>
+                <span class="step-hint">
+                  Cada caso recibe un EPC único: es la unidad que se mueve y se
+                  rastrea.
+                </span>
+              </span>
+            </a>
+            <a routerLink="/guide" class="onboarding-step">
+              <span class="check">3</span>
+              <span>
+                <span class="step-name">Lee la guía rápida</span>
+                <span class="step-hint">
+                  Te explica los conceptos y el flujo completo en 5 pasos.
+                </span>
+              </span>
+            </a>
+          </div>
+        </section>
+      }
 
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="card">
@@ -75,7 +122,7 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
               @for (item of cases().slice(0, 6); track item.id) {
                 <button type="button" class="case-row" (click)="goToTrace(item.id)">
                   <span class="flex items-center gap-2">
-                    <span class="badge" [style.background]="statusColor(item.status)" [style.color]="'#0b0f17'">
+                    <span class="badge" [style.background]="statusColor(item.status)" style="color: #fff">
                       {{ statusLabel(item.status) }}
                     </span>
                     <span class="font-mono text-xs">{{ short(item.id) }}</span>
@@ -96,7 +143,7 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
           <h2 class="text-sm font-semibold mb-3">Accesos rápidos</h2>
           <div class="grid gap-2">
             <a routerLink="/products" class="quick">
-              <span class="text-sm">Productos y lotes</span>
+              <span class="text-sm">Productos y casos</span>
               <span class="text-xs text-mut">Crea catálogo y genera casos</span>
             </a>
             <a routerLink="/trace" class="quick">
@@ -106,6 +153,10 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
             <a routerLink="/notices" class="quick">
               <span class="text-sm">Avisos</span>
               <span class="text-xs text-mut">Publica retiros y reconoce avisos</span>
+            </a>
+            <a routerLink="/guide" class="quick">
+              <span class="text-sm">Guía rápida</span>
+              <span class="text-xs text-mut">Conceptos y flujo explicados desde cero</span>
             </a>
           </div>
         </section>
@@ -166,22 +217,100 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
     .link:hover {
       text-decoration: underline;
     }
+    .alert-success {
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.55rem;
+      border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+      background: color-mix(in srgb, var(--color-success) 8%, transparent);
+      color: var(--color-success);
+      font-size: 0.875rem;
+    }
+    .onboarding-list {
+      display: grid;
+      gap: 0.6rem;
+      margin-top: 0.9rem;
+    }
+    .onboarding-step {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      padding: 0.7rem 0.8rem;
+      border-radius: 0.55rem;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-2);
+      color: var(--color-ink);
+      text-decoration: none;
+    }
+    .onboarding-step:hover {
+      border-color: var(--color-accent);
+    }
+    .onboarding-step.done {
+      opacity: 0.75;
+    }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 9999px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex: none;
+    }
+    .onboarding-step.done .check {
+      background: var(--color-success);
+      border-color: var(--color-success);
+      color: #fff;
+    }
+    .step-name {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .step-hint {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--color-mut);
+      margin-top: 0.1rem;
+      line-height: 1.35;
+    }
   `,
 })
 export class Dashboard implements OnInit {
   private readonly auth = inject(Auth);
   private readonly api = inject(Api);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   private readonly meState = signal<MeResponse | null>(null);
   readonly me = this.meState.asReadonly();
   readonly products = signal<Product[]>([]);
   readonly cases = signal<Epc[]>([]);
+  readonly onboarded = signal(
+    this.route.snapshot.queryParamMap.get('onboarded') === '1',
+  );
+  readonly activityNames = computed(() =>
+    (this.meState()?.actor?.activities ?? [])
+      .map((activity) => activityLabel(activity.code, activity.name))
+      .join(' · '),
+  );
 
   ngOnInit(): void {
     this.auth
       .me()
-      .then((me) => this.meState.set(me))
+      .then((me) => {
+        this.meState.set(me);
+        if (
+          me.actor &&
+          me.actor.activities.length === 0 &&
+          me.user.roles.includes('owner')
+        ) {
+          void this.router.navigate(['/onboarding'], { replaceUrl: true });
+        }
+      })
       .catch(() => this.meState.set(null));
 
     this.api

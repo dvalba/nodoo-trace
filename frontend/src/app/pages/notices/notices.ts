@@ -27,7 +27,9 @@ import type {
       <div>
         <h1 class="text-xl font-semibold tracking-tight">Avisos</h1>
         <p class="text-sm text-mut mt-1">
-          Retiros y avisos emitidos contra productos, lotes y casos.
+          Un aviso alerta sobre un producto, lote o caso. Un retiro pide
+          devolver o inmovilizar las unidades afectadas y los implicados deben
+          reconocerlo.
         </p>
       </div>
 
@@ -116,7 +118,7 @@ import type {
             </div>
 
             @if (createError()) {
-              <div class="text-sm" style="color: #f08a8a">{{ createError() }}</div>
+              <div class="text-sm" style="color: var(--color-danger)">{{ createError() }}</div>
             }
 
             <button type="button" class="btn-primary" [disabled]="createBusy()" (click)="createNotice()">
@@ -267,12 +269,12 @@ import type {
       letter-spacing: 0.03em;
     }
     .badge.recall {
-      background: #f08a8a;
-      color: #2a0d0d;
+      background: #fbd5d0;
+      color: #7a1c14;
     }
     .badge.advisory {
-      background: #e0b458;
-      color: #2a2008;
+      background: #fdecc8;
+      color: #7a4d00;
     }
     .ack-row {
       display: flex;
