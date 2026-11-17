@@ -91,9 +91,11 @@ curl -s http://localhost:3001/api/v1/notices/7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a5
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### Registro en modo demo
+### Registro y onboarding
 
-`POST /auth/register` requiere `activityCodes` (consulta `GET /activity-types`). En modo demo el actor se aprueba y el owner queda activo al instante, para que puedas entrar sin verificar el correo. Fuera de demo se mantiene el flujo de verificación por email y aprobación.
+`POST /auth/register` **no** pide actividades. En modo demo el actor se aprueba y el owner queda activo al instante, para que puedas entrar sin verificar el correo; fuera de demo se mantiene el flujo de verificación por email y aprobación.
+
+Al entrar por primera vez, el owner define qué hace su empresa con `GET /actor/operations` y luego usa `POST /actor/operations/suggestions` para recibir combinaciones de actividad que cubren sus operaciones. Puede aceptar una con `POST /actor/operations/accept` o crear una clasificación propia con `POST /actor/operations/custom`. Esa actividad habilita las operaciones que podrá ejecutar.
 
 ## Variables de entorno
 
@@ -118,7 +120,8 @@ curl -s http://localhost:3001/api/v1/notices/7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a5
 ## Endpoints principales
 
 - `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
-- `GET /activity-types`
+- `GET /activity-types`, `GET /actors/:actorId`
+- `GET /actor/operations`, `POST /actor/operations/{suggestions,accept,custom}`
 - `POST/GET /products`, `GET /products/:productId`, `POST/GET /products/:productId/batches`
 - `POST /epcs`, `GET /epcs`, `POST /epcs/:epc/{receive,ship,invoice,aggregate,disaggregate}`, `POST /epcs/transform`
 - `GET /epcs/:epc`, `GET /epcs/:epc/history`

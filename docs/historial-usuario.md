@@ -5,11 +5,10 @@ Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
 
 ## 1. Un owner registra su organización
 
-1. Consulta `GET /activity-types` y llama a `POST /auth/register` con los
-   datos de la organización (`name`, `organizationNumber`), de su cuenta
-   (`email`, `password`, `fullName`) y los tipos de actividad elegidos
-   (`activityCodes`). Las actividades se asignan en el registro, así que la
-   organización puede operar en cuanto esté aprobada.
+1. Llama a `POST /auth/register` con los datos de la organización
+   (`legalName`, `organizationNumber`) y de su cuenta (`adminEmail`,
+   `adminPassword`, `adminFullName`). **No se piden actividades**: se definen
+   en el onboarding, según las operaciones que haga la empresa.
 2. La organización queda creada en estado `PENDING_APPROVAL` y su cuenta
    como `EMAIL_UNVERIFIED`; se genera un email de verificación a su nombre
    (hoy se escribe a un archivo local, no se envía por SMTP).
@@ -19,20 +18,23 @@ Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
 4. El staff de la plataforma aprueba la organización
    (`PATCH /admin/actors/:id/approval`): el actor pasa a `APPROVED` y todos
    sus usuarios en `AWAITING_APPROVAL` se activan.
-5. Ya puede loguearse con `POST /auth/login` (devuelve un JWT) y usar el
-   frontend. Si necesita cambiar sus actividades puede usar el onboarding:
+5. Ya puede loguearse con `POST /auth/login` (devuelve un JWT). En el primer
+   acceso, el owner completa el onboarding de operaciones:
    - `GET /actor/operations`: catálogo de operaciones agrupadas
      (producción, movimiento, almacenaje, comercio, transformación,
      asociaciones).
-   - `POST /actor/operations/suggestions`: le sugiere hasta 3 combinaciones de
-     tipos de actividad que cubren las operaciones que marcó.
-   - `POST /actor/operations/accept`: asigna los tipos de actividad elegidos;
-     validan que cubren todas las operaciones marcadas.
-   - `POST /actor/operations/custom`: alternativa para crear un tipo de
-     actividad propio con exactamente las operaciones que necesita.
+   - `POST /actor/operations/suggestions`: según las operaciones marcadas,
+     devuelve hasta 3 combinaciones de actividades que las cubren.
+   - `POST /actor/operations/accept`: asigna la combinación elegida; valida
+     que cubra todas las operaciones marcadas.
+   - `POST /actor/operations/custom`: alternativa para crear una actividad
+     propia con exactamente las operaciones seleccionadas.
+6. Con la actividad asignada, el usuario puede ejecutar las operaciones que
+   habilitó (comisionar, enviar, recibir, facturar, etc.) y el frontend deja
+   de redirigirlo al onboarding.
 
 > En modo demo (`DEMO_SEED=true`), el registro aprueba la organización y deja
-> la cuenta `ACTIVE` al instante para probar sin verificar el correo.
+> la cuenta `ACTIVE` al instante; el owner entra directamente al onboarding.
 
 ## 2. El staff de la plataforma
 

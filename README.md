@@ -35,6 +35,8 @@ La semilla crea una cadena farmacéutica con tres organizaciones aprobadas, caso
 | Distribuidora MediAndes | Mayorista | `distribuidora@demo.nodoo.local` |
 | Hospital San Rafael | Minorista | `hospital@demo.nodoo.local` |
 
+Estas cuentas ya tienen su actividad configurada. Si registras una organización nueva, el primer paso tras iniciar sesión es el **onboarding**: marcas las operaciones de tu empresa y el sistema te sugiere una actividad (o creas la tuya).
+
 Detalle de la historia, EPCs de ejemplo y prueba con `curl` en [backend/README.md](backend/README.md#semilla-de-desarrollo). Si ya tenías una base con una demo anterior, ejecuta `pnpm db:reset` y vuelve a arrancar.
 
 Otros scripts de la raíz: `pnpm dev:backend`, `pnpm dev:frontend`, `pnpm db:up`,
