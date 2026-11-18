@@ -34,41 +34,38 @@ import { activityLabel } from '../core/labels';
           }
         </div>
 
-        <nav class="flex-1 px-3 py-4 space-y-5">
-          <div>
-            <div class="nav-group">General</div>
-            <a
-              routerLink="/"
-              routerLinkActive="is-active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              class="nav-item"
-            >
-              Inicio
-            </a>
-            <a routerLink="/guide" routerLinkActive="is-active" class="nav-item">
-              Guía rápida
-            </a>
-          </div>
-          <div>
-            <div class="nav-group">Operación</div>
-            <a
-              routerLink="/products"
-              routerLinkActive="is-active"
-              class="nav-item"
-            >
-              Productos y casos
-            </a>
-            <a routerLink="/trace" routerLinkActive="is-active" class="nav-item">
-              Trazabilidad
-            </a>
-            <a
-              routerLink="/notices"
-              routerLinkActive="is-active"
-              class="nav-item"
-            >
-              Avisos
-            </a>
-          </div>
+        <nav class="flex-1 px-3 py-4 space-y-1">
+          <a
+            routerLink="/"
+            routerLinkActive="is-active"
+            [routerLinkActiveOptions]="{ exact: true }"
+            class="nav-item"
+          >
+            Inicio
+          </a>
+          <a
+            routerLink="/products"
+            routerLinkActive="is-active"
+            class="nav-item"
+          >
+            Productos
+          </a>
+          <a routerLink="/trace" routerLinkActive="is-active" class="nav-item">
+            Trazabilidad
+          </a>
+          <a routerLink="/notices" routerLinkActive="is-active" class="nav-item">
+            Avisos
+          </a>
+          <a routerLink="/team" routerLinkActive="is-active" class="nav-item">
+            Equipo
+          </a>
+          <a
+            routerLink="/organization"
+            routerLinkActive="is-active"
+            class="nav-item"
+          >
+            Organización
+          </a>
         </nav>
 
         <div class="px-3 py-3 border-t border-border">
@@ -91,9 +88,6 @@ import { activityLabel } from '../core/labels';
             {{ me()?.actor?.name ?? 'Tu organización' }}
           </div>
           <div class="flex items-center gap-3">
-            <a routerLink="/guide" class="header-link hidden sm:inline">
-              ¿Cómo funciona?
-            </a>
             <div class="text-right hidden sm:block">
               <div class="text-sm">{{ me()?.user?.fullName ?? '…' }}</div>
               <div class="text-xs text-mut">{{ me()?.user?.email ?? '' }}</div>
@@ -117,8 +111,11 @@ import { activityLabel } from '../core/labels';
           <a routerLink="/notices" routerLinkActive="is-active" class="pill">
             Avisos
           </a>
-          <a routerLink="/guide" routerLinkActive="is-active" class="pill">
-            Guía
+          <a routerLink="/team" routerLinkActive="is-active" class="pill">
+            Equipo
+          </a>
+          <a routerLink="/organization" routerLinkActive="is-active" class="pill">
+            Organización
           </a>
         </nav>
 

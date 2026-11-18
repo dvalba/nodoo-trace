@@ -27,11 +27,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', loadComponent: () => import('./pages/dashboard/dashboard').then((m) => m.Dashboard) },
-      { path: 'guide', loadComponent: () => import('./pages/guide/guide').then((m) => m.Guide) },
       { path: 'products', loadComponent: () => import('./pages/products/products').then((m) => m.Products) },
       { path: 'trace', loadComponent: () => import('./pages/trace/trace').then((m) => m.Trace) },
       { path: 'notices', loadComponent: () => import('./pages/notices/notices').then((m) => m.Notices) },
       { path: 'team', loadComponent: () => import('./pages/team/team').then((m) => m.Team) },
+      {
+        path: 'organization',
+        loadComponent: () =>
+          import('./pages/organization/organization').then((m) => m.Organization),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

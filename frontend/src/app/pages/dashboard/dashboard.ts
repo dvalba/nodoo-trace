@@ -93,12 +93,13 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
                 </span>
               </span>
             </a>
-            <a routerLink="/guide" class="onboarding-step">
+            <a routerLink="/team" class="onboarding-step">
               <span class="check">3</span>
               <span>
-                <span class="step-name">Lee la guía rápida</span>
+                <span class="step-name">Invita a tu equipo</span>
                 <span class="step-hint">
-                  Te explica los conceptos y el flujo completo en 5 pasos.
+                  Agrega a otras personas de tu organización y asigna sus
+                  permisos.
                 </span>
               </span>
             </a>
@@ -154,9 +155,9 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
               <span class="text-sm">Avisos</span>
               <span class="text-xs text-mut">Publica retiros y reconoce avisos</span>
             </a>
-            <a routerLink="/guide" class="quick">
-              <span class="text-sm">Guía rápida</span>
-              <span class="text-xs text-mut">Conceptos y flujo explicados desde cero</span>
+            <a routerLink="/team" class="quick">
+              <span class="text-sm">Equipo</span>
+              <span class="text-xs text-mut">Invita miembros y gestiona permisos</span>
             </a>
           </div>
         </section>
