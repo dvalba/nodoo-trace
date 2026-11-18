@@ -91,13 +91,15 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
       <div class="card">
         <div class="flex flex-wrap gap-3 items-end">
           <div class="flex-1 min-w-[240px]">
-            <label class="block text-sm mb-1" for="epc">EPC URN</label>
+            <label class="block text-sm mb-1" for="epc">
+              EPC, SKU o lote
+            </label>
             <input
               id="epc"
               [(ngModel)]="query"
               (keyup.enter)="lookup()"
               class="field font-mono text-xs"
-              placeholder="urn:nodoo:epc:…"
+              placeholder="urn:nodoo:epc:…, SKU o código de lote"
             />
           </div>
           <button
@@ -114,6 +116,39 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
           <div class="mt-3 text-sm" style="color: var(--color-danger)">{{ error() }}</div>
         }
       </div>
+
+      @if (results().length > 1) {
+        <section class="card">
+          <h2 class="text-sm font-semibold mb-3">
+            Casos coincidentes · {{ results().length }}
+          </h2>
+          <p class="text-xs text-mut mb-3">
+            Tu búsqueda coincide con varios casos. Elige el que quieres
+            consultar.
+          </p>
+          <div class="grid gap-2 md:grid-cols-2">
+            @for (item of results(); track item.id) {
+              <button type="button" class="case-row" (click)="load(item.id)">
+                <span class="flex items-center gap-2">
+                  <span class="badge" [style.background]="statusColor(item.status)" [style.color]="'#0b0f17'">
+                    {{ statusLabel(item.status) }}
+                  </span>
+                  <span class="font-mono text-xs">{{ short(item.id) }}</span>
+                </span>
+                <span class="text-xs text-mut">
+                  {{ item.product?.name ?? 'Producto' }}
+                  @if (item.product) {
+                    · {{ item.product.sku }}
+                  }
+                  @if (item.batch) {
+                    · Lote {{ item.batch.batchCode }}
+                  }
+                </span>
+              </button>
+            }
+          </div>
+        </section>
+      }
 
       <section class="card">
         <h2 class="text-sm font-semibold mb-3">
@@ -435,6 +470,7 @@ export class Trace implements OnInit, AfterViewChecked {
   readonly history = signal<EpcHistoryEntry[]>([]);
   readonly notices = signal<Notice[]>([]);
   readonly myCases = signal<Epc[]>([]);
+  readonly results = signal<Epc[]>([]);
 
   readonly myActorId = signal<string | null>(null);
   readonly myOperations = signal<ReadonlySet<string>>(new Set());
@@ -494,10 +530,44 @@ export class Trace implements OnInit, AfterViewChecked {
   lookup(): void {
     const q = this.query.trim();
     if (!q) {
-      this.error.set('Ingresa un URN de EPC.');
+      this.error.set('Ingresa un EPC, SKU o lote.');
       return;
     }
-    this.load(q);
+    this.error.set(null);
+    this.actionError.set(null);
+    this.actionMessage.set(null);
+    this.results.set([]);
+
+    if (q.startsWith('urn:')) {
+      this.load(q);
+      return;
+    }
+
+    this.busy.set(true);
+    this.api
+      .listEpcs({ q })
+      .then((matches) => {
+        this.busy.set(false);
+        if (matches.length === 0) {
+          this.epc.set(null);
+          this.history.set([]);
+          this.notices.set([]);
+          this.error.set(
+            'No se encontraron casos con ese EPC, SKU o lote en tu organización.',
+          );
+          return;
+        }
+        if (matches.length === 1) {
+          this.query = matches[0].id;
+          this.load(matches[0].id);
+          return;
+        }
+        this.results.set(matches);
+      })
+      .catch((err: unknown) => {
+        this.busy.set(false);
+        this.error.set(this.messageFrom(err, 'No se pudo completar la búsqueda.'));
+      });
   }
 
   load(urn: string): void {
@@ -505,6 +575,7 @@ export class Trace implements OnInit, AfterViewChecked {
     this.error.set(null);
     this.actionError.set(null);
     this.actionMessage.set(null);
+    this.results.set([]);
     this.epc.set(null);
     this.history.set([]);
     this.notices.set([]);
