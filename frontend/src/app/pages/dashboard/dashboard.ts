@@ -15,12 +15,12 @@ const STATUS_LABELS: Record<EpcStatus, string> = {
 };
 
 const STATUS_STYLES: Record<EpcStatus, string> = {
-  active: '#0f7a4f',
-  in_transit: '#1d5fbf',
-  in_progress: '#8a5a00',
-  consumed: '#5f6f89',
-  damaged: '#b42318',
-  expired: '#7a3e9d',
+  active: '#5ec88a',
+  in_transit: '#6aa9e8',
+  in_progress: '#e0b458',
+  consumed: '#8a97ad',
+  damaged: '#f08a8a',
+  expired: '#c98ad6',
 };
 
 @Component({
@@ -122,7 +122,7 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
               @for (item of cases().slice(0, 6); track item.id) {
                 <button type="button" class="case-row" (click)="goToTrace(item.id)">
                   <span class="flex items-center gap-2">
-                    <span class="badge" [style.background]="statusColor(item.status)" style="color: #fff">
+                    <span class="badge" [style.background]="statusColor(item.status)" [style.color]="'#0b0f17'">
                       {{ statusLabel(item.status) }}
                     </span>
                     <span class="font-mono text-xs">{{ short(item.id) }}</span>
@@ -263,7 +263,7 @@ const STATUS_STYLES: Record<EpcStatus, string> = {
     .onboarding-step.done .check {
       background: var(--color-success);
       border-color: var(--color-success);
-      color: #fff;
+      color: #0b0f17;
     }
     .step-name {
       display: block;

@@ -22,12 +22,12 @@ import type {
 } from '../../core/models';
 
 const STATUS_STYLES: Record<EpcStatus, string> = {
-  active: '#0f7a4f',
-  in_transit: '#1d5fbf',
-  in_progress: '#8a5a00',
-  consumed: '#5f6f89',
-  damaged: '#b42318',
-  expired: '#7a3e9d',
+  active: '#5ec88a',
+  in_transit: '#6aa9e8',
+  in_progress: '#e0b458',
+  consumed: '#8a97ad',
+  damaged: '#f08a8a',
+  expired: '#c98ad6',
 };
 
 const TYPE_LABELS: Record<EventType, string> = {
@@ -128,7 +128,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
             @for (item of myCases(); track item.id) {
               <button type="button" class="case-row" (click)="load(item.id)">
                 <span class="flex items-center gap-2">
-                  <span class="badge" [style.background]="statusColor(item.status)" style="color: #fff">
+                  <span class="badge" [style.background]="statusColor(item.status)" [style.color]="'#0b0f17'">
                     {{ statusLabel(item.status) }}
                   </span>
                   <span class="font-mono text-xs">{{ short(item.id) }}</span>
@@ -155,7 +155,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                 <span
                   class="badge"
                   [style.background]="statusColor(twin.status)"
-                  style="color: #fff"
+                  [style.color]="'#0b0f17'"
                 >
                   {{ statusLabel(twin.status) }}
                 </span>
@@ -305,7 +305,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                           <span
                             class="badge"
                             [style.background]="statusColor(entry.disposition)"
-                            style="color: #fff"
+                            [style.color]="'#0b0f17'"
                           >
                             {{ statusLabel(entry.disposition) }}
                           </span>

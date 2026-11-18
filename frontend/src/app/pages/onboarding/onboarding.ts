@@ -305,11 +305,12 @@ interface OperationGroup {
     .steps li.done .num {
       background: var(--color-success);
       border-color: var(--color-success);
-      color: #fff;
+      color: #0b0f17;
     }
     .steps li.active .num {
       background: var(--color-accent);
       border-color: var(--color-accent);
+      color: var(--color-accent-ink);
       color: var(--color-accent-ink);
     }
     .steps li.active,

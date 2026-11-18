@@ -269,12 +269,12 @@ import type {
       letter-spacing: 0.03em;
     }
     .badge.recall {
-      background: #fbd5d0;
-      color: #7a1c14;
+      background: #f08a8a;
+      color: #2a0d0d;
     }
     .badge.advisory {
-      background: #fdecc8;
-      color: #7a4d00;
+      background: #e0b458;
+      color: #2a2008;
     }
     .ack-row {
       display: flex;
