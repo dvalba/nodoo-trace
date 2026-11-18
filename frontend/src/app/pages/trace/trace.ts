@@ -449,7 +449,7 @@ export class Trace implements OnInit, AfterViewChecked {
 
   ngOnInit(): void {
     this.auth
-      .me()
+      .refreshMe()
       .then((me) => {
         this.myActorId.set(me.actor?.id ?? me.user.actorId);
         this.myOperations.set(new Set(me.actor?.operations ?? []));

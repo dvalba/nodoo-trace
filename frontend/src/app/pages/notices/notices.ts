@@ -332,7 +332,7 @@ export class Notices implements OnInit, AfterViewChecked {
 
   ngOnInit(): void {
     this.auth
-      .me()
+      .refreshMe()
       .then((me) => this.myActorId.set(me.actor?.id ?? me.user.actorId))
       .catch(() => this.myActorId.set(null));
 

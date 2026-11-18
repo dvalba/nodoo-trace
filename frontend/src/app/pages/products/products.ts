@@ -294,7 +294,7 @@ export class Products implements OnInit {
 
   ngOnInit(): void {
     this.auth
-      .me()
+      .refreshMe()
       .then((me) =>
         this.myOperations.set(new Set(me.actor?.operations ?? [])),
       )

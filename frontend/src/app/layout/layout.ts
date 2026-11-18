@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import {
   Router,
   RouterLink,
@@ -8,7 +8,6 @@ import {
 import { Auth } from '../core/auth.service';
 import { Directory } from '../core/directory.service';
 import { activityLabel } from '../core/labels';
-import type { MeResponse } from '../core/models';
 
 @Component({
   selector: 'app-layout',
@@ -214,10 +213,9 @@ export class Layout implements OnInit {
   private readonly directory = inject(Directory);
   private readonly router = inject(Router);
 
-  private readonly meState = signal<MeResponse | null>(null);
-  readonly me = this.meState.asReadonly();
+  readonly me = this.auth.me;
   readonly initials = computed(() => {
-    const me = this.meState();
+    const me = this.auth.me();
     const name = me?.user?.fullName || me?.user?.email || '';
     return name
       .split(/\s+/)
@@ -229,7 +227,7 @@ export class Layout implements OnInit {
   });
 
   readonly activityNames = computed(() => {
-    const activities = this.meState()?.actor?.activities ?? [];
+    const activities = this.auth.me()?.actor?.activities ?? [];
     return activities
       .map((activity) => activityLabel(activity.code, activity.name))
       .join(' · ');
@@ -237,9 +235,8 @@ export class Layout implements OnInit {
 
   ngOnInit(): void {
     this.auth
-      .me()
+      .refreshMe()
       .then((me) => {
-        this.meState.set(me);
         if (me.actor) {
           void this.directory.get(me.actor.id);
           if (

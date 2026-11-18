@@ -79,6 +79,17 @@ export function operationGroupLabel(group: string): string {
   return OPERATION_GROUP_LABELS[group] ?? group;
 }
 
+export const USER_ROLE_LABELS: Record<string, string> = {
+  owner: 'Propietario',
+  member: 'Miembro',
+  viewer: 'Observador',
+  admin: 'Administrador',
+};
+
+export function userRoleLabel(role: string): string {
+  return USER_ROLE_LABELS[role] ?? role;
+}
+
 export function activityLabel(code: string, fallback?: string): string {
   return ACTIVITY_LABELS[code] ?? fallback ?? code;
 }

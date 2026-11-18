@@ -564,7 +564,7 @@ export class Onboarding implements OnInit {
 
   ngOnInit(): void {
     this.auth
-      .me()
+      .refreshMe()
       .then((me) => this.prepare(me))
       .catch(() => {
         this.blocked.set('No pudimos cargar tu cuenta. Vuelve a iniciar sesión.');

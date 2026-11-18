@@ -1,11 +1,62 @@
-export type PlatformRole = 'user' | 'admin';
+export type PlatformRole = 'user' | 'staff';
 
-export type UserRole =
-  | 'owner'
-  | 'operator'
-  | 'viewer'
-  | 'approver'
-  | 'auditor';
+export type UserRole = 'owner' | 'member' | 'viewer' | 'admin';
+
+export type UserStatus =
+  | 'email_unverified'
+  | 'awaiting_approval'
+  | 'active'
+  | 'suspended'
+  | 'banned';
+
+export type ActorStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'suspended';
+
+export interface InvitationPreview {
+  inviteId: string;
+  actorId: string;
+  actorName: string;
+  actorStatus: ActorStatus;
+  email: string;
+  roles: UserRole[];
+  expiresAt: string;
+  hasAccount: boolean;
+  userId?: string;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  roles: UserRole[];
+  actorName: string;
+  actorStatus: ActorStatus;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  emailSent: boolean;
+  invitedBy: { id: string; email: string };
+}
+
+export interface InvitationActionResult {
+  userId: string;
+  email: string;
+  created: boolean;
+  userStatus: UserStatus;
+  actorStatus: ActorStatus;
+  message: string;
+}
+
+export interface Member {
+  id: string;
+  email: string;
+  fullName: string;
+  roles: UserRole[];
+  status: UserStatus;
+  createdAt: string;
+}
 
 export interface AuthUser {
   id: string;
@@ -78,7 +129,6 @@ export interface RegisterResponse {
   };
   user: AuthUser & { status: string };
   emailSent: boolean;
-  demoMode: boolean;
   message: string;
 }
 

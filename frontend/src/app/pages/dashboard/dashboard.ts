@@ -300,7 +300,7 @@ export class Dashboard implements OnInit {
 
   ngOnInit(): void {
     this.auth
-      .me()
+      .refreshMe()
       .then((me) => {
         this.meState.set(me);
         if (

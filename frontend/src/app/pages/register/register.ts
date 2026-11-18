@@ -254,10 +254,7 @@ export class Register implements OnInit {
       })
       .then((response) =>
         this.router.navigate(['/login'], {
-          queryParams: {
-            registered: '1',
-            demo: response.demoMode ? '1' : null,
-          },
+          queryParams: { registered: '1' },
         }),
       )
       .catch((err: unknown) => this.error.set(this.messageFrom(err)))

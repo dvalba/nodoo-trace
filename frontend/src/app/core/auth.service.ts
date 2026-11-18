@@ -21,7 +21,10 @@ export class Auth {
     localStorage.getItem(TOKEN_KEY),
   );
 
+  private readonly meState = signal<MeResponse | null>(null);
+
   readonly token = this.tokenState.asReadonly();
+  readonly me = this.meState.asReadonly();
   readonly isAuthenticated = computed(() => this.token() !== null);
 
   get accessToken(): string | null {
@@ -44,12 +47,18 @@ export class Auth {
     );
   }
 
-  me(): Promise<MeResponse> {
-    return firstValueFrom(this.http.get<MeResponse>(`${BASE}/auth/me`));
+  refreshMe(): Promise<MeResponse> {
+    return firstValueFrom(this.http.get<MeResponse>(`${BASE}/auth/me`)).then(
+      (me) => {
+        this.meState.set(me);
+        return me;
+      },
+    );
   }
 
   logout(): void {
     this.tokenState.set(null);
+    this.meState.set(null);
     localStorage.removeItem(TOKEN_KEY);
     void this.router.navigate(['/login']);
   }

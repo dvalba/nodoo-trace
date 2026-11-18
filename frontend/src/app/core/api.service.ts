@@ -11,12 +11,17 @@ import type {
   CustomActivityResponse,
   Epc,
   EpcHistoryEntry,
+  Invitation,
+  InvitationActionResult,
+  InvitationPreview,
   MeResponse,
+  Member,
   Notice,
   NoticeAck,
   Operation,
   OperationSuggestion,
   Product,
+  UserRole,
 } from './models';
 
 const BASE = '/api/v1';
@@ -120,8 +125,79 @@ export class Api {
     );
   }
 
-  listEpcs(): Promise<Epc[]> {
-    return this.req(this.http.get<Epc[]>(`${BASE}/epcs`));
+  listEpcs(params?: { q?: string; productId?: string; batchId?: string }) {
+    const search = new URLSearchParams();
+    if (params?.q) search.set('q', params.q);
+    if (params?.productId) search.set('productId', params.productId);
+    if (params?.batchId) search.set('batchId', params.batchId);
+    const query = search.toString();
+    return this.req(
+      this.http.get<Epc[]>(`${BASE}/epcs${query ? `?${query}` : ''}`),
+    );
+  }
+
+  previewInvitation(token: string): Promise<InvitationPreview> {
+    return this.req(
+      this.http.get<InvitationPreview>(
+        `${BASE}/invitations/${encodeURIComponent(token)}/preview`,
+      ),
+    );
+  }
+
+  acceptInvitation(payload: {
+    inviteToken: string;
+    fullName: string;
+    password: string;
+  }): Promise<InvitationActionResult> {
+    return this.req(
+      this.http.post<InvitationActionResult>(
+        `${BASE}/invitations/accept`,
+        payload,
+      ),
+    );
+  }
+
+  verifyEmailToken(token: string): Promise<InvitationActionResult> {
+    return this.req(
+      this.http.post<InvitationActionResult>(`${BASE}/invitations/verify`, {
+        token,
+      }),
+    );
+  }
+
+  resendVerification(email: string): Promise<{
+    email: string;
+    emailSent: boolean;
+    message: string;
+  }> {
+    return this.req(
+      this.http.post<{ email: string; emailSent: boolean; message: string }>(
+        `${BASE}/auth/verification/resend`,
+        { email },
+      ),
+    );
+  }
+
+  listMembers(): Promise<Member[]> {
+    return this.req(this.http.get<Member[]>(`${BASE}/users`));
+  }
+
+  inviteMember(payload: { email: string; roles: UserRole[] }): Promise<Invitation> {
+    return this.req(this.http.post<Invitation>(`${BASE}/invitations`, payload));
+  }
+
+  addMemberRoles(userId: string, roles: UserRole[]): Promise<Member> {
+    return this.req(
+      this.http.patch<Member>(`${BASE}/users/${userId}`, { roles }),
+    );
+  }
+
+  removeMember(userId: string): Promise<{ deleted: boolean; userId: string }> {
+    return this.req(
+      this.http.delete<{ deleted: boolean; userId: string }>(
+        `${BASE}/users/${userId}`,
+      ),
+    );
   }
 
   createNotice(
