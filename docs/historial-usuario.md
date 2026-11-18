@@ -33,9 +33,6 @@ Todo se accede bajo `http://localhost:3001/api/v1` (Swagger en `/docs`).
    habilitó (comisionar, enviar, recibir, facturar, etc.) y el frontend deja
    de redirigirlo al onboarding.
 
-> En modo demo (`DEMO_SEED=true`), el registro aprueba la organización y deja
-> la cuenta `ACTIVE` al instante; el owner entra directamente al onboarding.
-
 ## 2. El staff de la plataforma
 
 - Se crea automáticamente al arrancar (seed con `STAFF_EMAIL`,

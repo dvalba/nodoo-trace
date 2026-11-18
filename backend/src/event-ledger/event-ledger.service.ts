@@ -394,25 +394,36 @@ export class EventLedgerService {
 
   async listEpc(
     actorId: string,
-    filter: { productId?: string; batchId?: string } = {},
+    filter: { productId?: string; batchId?: string; q?: string } = {},
   ): Promise<Epc[]> {
-    const scope = [
-      { ownerActorId: actorId },
-      { custodianActorId: actorId },
-      { producerActorId: actorId },
-    ];
+    const query = this.epcRepo
+      .createQueryBuilder('epc')
+      .innerJoinAndSelect('epc.product', 'product')
+      .leftJoinAndSelect('epc.batch', 'batch')
+      .where(
+        '(epc.producerActorId = :actorId OR epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId)',
+        { actorId },
+      );
 
-    const where = scope.map((entry) => ({
-      ...entry,
-      ...(filter.productId ? { productId: filter.productId } : {}),
-      ...(filter.batchId ? { batchId: filter.batchId } : {}),
-    }));
+    if (filter.productId) {
+      query.andWhere('epc.productId = :productId', {
+        productId: filter.productId,
+      });
+    }
 
-    return this.epcRepo.find({
-      where,
-      relations: { product: true, batch: true },
-      order: { commissionedAt: 'DESC' },
-    });
+    if (filter.batchId) {
+      query.andWhere('epc.batchId = :batchId', { batchId: filter.batchId });
+    }
+
+    const term = filter.q?.trim();
+    if (term) {
+      query.andWhere(
+        '(epc.id ILIKE :pattern OR product.sku ILIKE :pattern OR batch.batchCode ILIKE :pattern)',
+        { pattern: `%${term}%` },
+      );
+    }
+
+    return query.orderBy('epc.commissionedAt', 'DESC').getMany();
   }
 
   async getEpc(actorId: string, epcId: string): Promise<Epc> {

@@ -1,5 +1,4 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { RegisterActorDto } from './dto/register-actor-dto.js';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../users/users.service.js';
@@ -24,7 +23,6 @@ export class AuthService {
     private readonly inviteService: InvitationsService,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterActorDto) {
@@ -32,19 +30,8 @@ export class AuthService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    const demoMode = this.config.get<boolean>('DEMO_SEED') === true;
-
     try {
       const actor = await this.actorService.createActor(dto, queryRunner);
-
-      if (demoMode) {
-        await this.actorService.updateStatus(
-          actor.id,
-          ActorStatus.APPROVED,
-          queryRunner.manager,
-        );
-        actor.status = ActorStatus.APPROVED;
-      }
 
       const user = await this.userService.createUser(
         {
@@ -54,21 +41,18 @@ export class AuthService {
           actorId: actor.id,
           platformRoles: [PlatformRole.USER],
           roles: [UserRole.OWNER],
-          status: demoMode ? UserStatus.ACTIVE : UserStatus.EMAIL_UNVERIFIED,
+          status: UserStatus.EMAIL_UNVERIFIED,
         },
         queryRunner,
       );
 
-      let emailSent = false;
-      if (!demoMode) {
-        const result = await this.inviteService.createOwnerVerification(
-          actor.id,
-          dto.adminEmail,
-          actor.name,
-          queryRunner,
-        );
-        emailSent = result.emailSent;
-      }
+      const result = await this.inviteService.createOwnerVerification(
+        actor.id,
+        dto.adminEmail,
+        actor.name,
+        queryRunner,
+      );
+      const emailSent = result.emailSent;
 
       await queryRunner.commitTransaction();
 
@@ -85,12 +69,9 @@ export class AuthService {
         },
         user: this.publicUser(user),
         emailSent,
-        demoMode,
-        message: demoMode
-          ? 'Organización creada y activada en modo demo. Inicia sesión y configura qué operaciones hace tu empresa.'
-          : emailSent
-            ? 'Registration successful. Verify your email, then sign in and configure your operations.'
-            : 'Registration successful, but we could not send the verification email. Please use the resend endpoint.',
+        message: emailSent
+          ? 'Registration successful. Verify your email, then sign in and configure your operations.'
+          : 'Registration successful, but we could not send the verification email. You can resend it from the sign in page.',
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -138,8 +119,12 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.AWAITING_APPROVAL) {
+      const actor = user.actorId
+        ? await this.actorService.findById(user.actorId)
+        : null;
       throw new UnauthorizedException({
         code: 'AWAITING_APPROVAL',
+        actorName: actor?.name ?? null,
         message:
           'Your organization is pending approval. We will notify you once it is active.',
       });
@@ -167,6 +152,7 @@ export class AuthService {
       if (!actor || actor.status !== ActorStatus.APPROVED) {
         throw new UnauthorizedException({
           code: 'AWAITING_APPROVAL',
+          actorName: actor?.name ?? null,
           message: 'Your organization is not active. Please contact support.',
         });
       }
@@ -185,6 +171,10 @@ export class AuthService {
         roles: user.roles,
       },
     };
+  }
+
+  async resendVerification(email: string) {
+    return this.inviteService.resendOwnerVerification(email);
   }
 
   async profile(user: { id: string; actorId: string | null }) {

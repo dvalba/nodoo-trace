@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -64,11 +63,6 @@ export class OperationsService {
     dto: AcceptActivitiesDto,
   ): Promise<{ actorId: string; activities: ActivityRef[] }> {
     const actor = await this.loadActorWithActivities(actorId);
-    if (actor.activities.length > 0) {
-      throw new ConflictException(
-        'This organization already has activities assigned',
-      );
-    }
 
     const activities = await this.activityService.findWithOperationsByCodes(
       dto.activityCodes,
@@ -103,11 +97,6 @@ export class OperationsService {
         relations: { activities: true },
       });
       if (!actor) throw new NotFoundException('Actor not found');
-      if (actor.activities.length > 0) {
-        throw new ConflictException(
-          'This organization already has activities assigned',
-        );
-      }
 
       const distinctOps = new Set(dto.operations);
       const operations = await manager.findBy(Operation, {

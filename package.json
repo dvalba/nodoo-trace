@@ -12,6 +12,7 @@
     "dev": "concurrently -n api,web -c yellow,cyan \"pnpm --filter backend start:dev\" \"pnpm --filter nodoo-trace-web start\"",
     "dev:backend": "pnpm --filter backend start:dev",
     "dev:frontend": "pnpm --filter nodoo-trace-web start",
+    "seed": "pnpm --filter backend seed",
     "build": "pnpm -r build",
     "lint": "pnpm --filter backend lint",
     "test": "pnpm --filter backend test"

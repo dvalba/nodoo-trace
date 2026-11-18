@@ -127,16 +127,18 @@ export class EpcsController {
   @ApiOperation({
     summary: 'List the EPCs visible to the caller',
     description:
-      'Returns the EPCs the caller produced, owns or currently custodies, optionally filtered by product or batch.',
+      'Returns the EPCs the caller produced, owns or currently custodies, optionally filtered by product, batch or a free-text search on EPC id, SKU or batch code.',
   })
   list(
     @Caller() user: AuthUser,
     @Query('productId') productId?: string,
     @Query('batchId') batchId?: string,
+    @Query('q') q?: string,
   ) {
     return this.eventLedgerService.listEpc(user.actorId, {
       productId,
       batchId,
+      q,
     });
   }
 

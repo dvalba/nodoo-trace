@@ -6,7 +6,7 @@ import { UsersModule } from '../users/users.module.js';
 import { Product } from '../products/entities/product.entity.js';
 import { Batch } from '../products/entities/batch.entity.js';
 import { EventLedgerModule } from '../event-ledger/event-ledger.module.js';
-import { DemoSeedService } from './demo-seed.service.js';
+import { SeedService } from './seed.service.js';
 
 @Module({
   imports: [
@@ -16,6 +16,6 @@ import { DemoSeedService } from './demo-seed.service.js';
     UsersModule,
     EventLedgerModule,
   ],
-  providers: [DemoSeedService],
+  providers: [SeedService],
 })
 export class SeedModule {}

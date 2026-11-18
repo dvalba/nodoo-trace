@@ -37,25 +37,25 @@ La app crea/actualiza el esquema automáticamente cuando `NODE_ENV` no es `produ
 
 Al arrancar se siembran los tipos de actividad, las operaciones y el usuario staff definido en `STAFF_*`.
 
-## Semilla de desarrollo
+## Semilla de datos
 
-Con `DEMO_SEED=true` en `backend/.env`, al arrancar se crea (una sola vez, de forma idempotente) una cadena **farmacéutica** con tres organizaciones ya aprobadas, sus productos/lotes, **casos rastreables** (cada caso es un EPC) y el historial del libro de eventos con fechas retroactivas, además de un retiro con acuses. Sirve para probar todo el flujo sin registrar nada.
+Ejecuta `pnpm seed` (raíz del repo) para crear de forma idempotente una cadena **farmacéutica** con tres organizaciones ya aprobadas, sus productos/lotes, **casos rastreables** (cada caso es un EPC) y el historial del libro de eventos con fechas retroactivas, además de un retiro con acuses. Sirve para no tener la base vacía mientras pruebas. El comando compila el backend y ejecuta `dist/scripts/seed.js`, y no hace nada si la cadena ya existe.
 
-> En esta demo los **pallets no son rastreables**: son unidades logísticas que agrupan casos y no se serializan, así que no tienen EPC ni historial. La unidad trazable es la **caja (case)**.
+> En esta semilla los **pallets no son rastreables**: son unidades logísticas que agrupan casos y no se serializan, así que no tienen EPC ni historial. La unidad trazable es la **caja (case)**.
 
 Los identificadores de productos, lotes, EPC y aviso son **deterministas**, por lo que los deep-links de la UI y los ejemplos de esta guía funcionan en cualquier siembra.
 
-> El seed hace *skip* si ya existe (detecta usuarios `@demo.nodoo.local`). Si vienes de una siembra anterior (p. ej. la demo de café), ejecuta `pnpm db:reset` y vuelve a arrancar para recrear la base con la cadena farmacéutica.
+> Para volver a sembrar desde cero: `pnpm db:reset && pnpm db:up && pnpm seed`.
 
 ### Cuentas de prueba
 
-Todas con contraseña **`Demo1234`**:
+Todas con contraseña **`Seed1234`**:
 
 | Organización | Rol (actividad) | Email |
 | --- | --- | --- |
-| Laboratorios FarmaSur | `manufacturer` | `laboratorio@demo.nodoo.local` |
-| Distribuidora MediAndes | `wholesaler` | `distribuidora@demo.nodoo.local` |
-| Hospital San Rafael | `retailer` | `hospital@demo.nodoo.local` |
+| Laboratorios FarmaSur | `manufacturer` | `laboratorio@seed.nodoo.local` |
+| Distribuidora MediAndes | `wholesaler` | `distribuidora@seed.nodoo.local` |
+| Hospital San Rafael | `retailer` | `hospital@seed.nodoo.local` |
 
 ### Historia sembrada
 
@@ -75,7 +75,7 @@ Aviso de ejemplo: `7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a54`.
 # 1) Login (devuelve accessToken + user)
 TOKEN=$(curl -s -X POST http://localhost:3001/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"hospital@demo.nodoo.local","password":"Demo1234"}' \
+  -d '{"email":"hospital@seed.nodoo.local","password":"Seed1234"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
 
 # 2) Casos visibles para mi organización
@@ -93,7 +93,7 @@ curl -s http://localhost:3001/api/v1/notices/7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a5
 
 ### Registro y onboarding
 
-`POST /auth/register` **no** pide actividades. En modo demo el actor se aprueba y el owner queda activo al instante, para que puedas entrar sin verificar el correo; fuera de demo se mantiene el flujo de verificación por email y aprobación.
+`POST /auth/register` **no** pide actividades. El owner queda `EMAIL_UNVERIFIED` hasta confirmar el enlace de verificación, y la organización pasa a aprobación por staff una vez verificada.
 
 Al entrar por primera vez, el owner define qué hace su empresa con `GET /actor/operations` y luego usa `POST /actor/operations/suggestions` para recibir combinaciones de actividad que cubren sus operaciones. Puede aceptar una con `POST /actor/operations/accept` o crear una clasificación propia con `POST /actor/operations/custom`. Esa actividad habilita las operaciones que podrá ejecutar.
 
@@ -113,7 +113,6 @@ Al entrar por primera vez, el owner define qué hace su empresa con `GET /actor/
 | `INVITATION_RESEND_INTERVAL` | Espera mínima entre reenvíos (ej. `5m`) |
 | `INVITATION_EXPIRES_IN` | Vida de la invitación (ej. `7d`) |
 | `STAFF_EMAIL`, `STAFF_PASSWORD`, `STAFF_FULL_NAME` | Usuario staff inicial |
-| `DEMO_SEED` | `true` siembra la cadena de desarrollo (ver "Semilla de desarrollo") |
 
 `docker compose` y la aplicación leen el mismo archivo `backend/.env`.
 

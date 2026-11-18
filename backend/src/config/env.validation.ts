@@ -20,9 +20,6 @@ export const envValidationSchema = Joi.object({
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default('2h'),
 
-  // ─── Demo seed ───────────────────────────────────────────────────────────
-  DEMO_SEED: Joi.boolean().default(false),
-
   // ─── Invitations ─────────────────────────────────────────────────────────
   TOKEN_SECRET: Joi.string().min(32).required(),
   INVITATION_RESEND_INTERVAL: Joi.string().required(),

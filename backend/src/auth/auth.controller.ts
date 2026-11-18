@@ -7,6 +7,7 @@ import { Auth } from './decorators/auth.decorator.js';
 import { Caller } from './decorators/caller.decorator.js';
 import type { AuthUser } from './interfaces/auth-user.interface.js';
 import { LoginDto } from './dto/login.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -46,18 +47,14 @@ export class AuthController {
     return this.authService.profile(user);
   }
 
-  // //TODO PONER UN GUARD PARA QUE SOLO LO HAGAN LOS USUARIOS ADMINS
-  // @Post('/actor/members/invite')
-  // @UseGuards(AuthGuard())
-  // inviteMember(@Caller() user: AuthUser , @Body() dto: InviteMemberDto) {
-  // }
-
-  //   // userI
-  //   validateEmail(){
-  //   }
-
-  //   @Post('accept-invite')
-  //   acceptInvite(@Body() dto: AcceptInviteDto) {
-  //     return this.authService.acceptInvite(dto);
-  //   }
+  @Public()
+  @Post('verification/resend')
+  @ApiOperation({
+    summary: 'Resend the email verification email',
+    description:
+      'Public. Reissues the pending owner-verification invitation for the given email and sends a new email. Applies the invitation cooldown. Only works while the account is still unverified.',
+  })
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto.email);
+  }
 }

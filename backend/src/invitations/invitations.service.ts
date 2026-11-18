@@ -211,6 +211,62 @@ export class InvitationsService {
     };
   }
 
+  async resendOwnerVerification(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.userService.findByEmail(normalized);
+    if (!user || !user.actorId) {
+      throw new NotFoundException(
+        'No pending verification found for this email',
+      );
+    }
+    if (user.status !== UserStatus.EMAIL_UNVERIFIED) {
+      throw new ConflictException('This email is already verified');
+    }
+
+    const pending = await this.inviteRepo.findPendingByEmail(
+      normalized,
+      user.actorId,
+    );
+    this.assertCooldownPassed(pending, this.resendIntervalMs);
+
+    const rawToken = this.tokens.generate();
+    const tokenHash = await this.tokens.hash(rawToken);
+    const expiresAt = new Date(Date.now() + this.expiresInMs);
+
+    const data = {
+      actorId: user.actorId,
+      email: normalized,
+      roles: [UserRole.OWNER] as UserRole[],
+      tokenHash,
+      expiresAt,
+    };
+
+    const invitation = pending
+      ? await this.inviteRepo.reissue(data, pending.id)
+      : await this.inviteRepo.create(data);
+
+    const actor = await this.actorService.findById(user.actorId);
+    const actorName = actor?.name ?? 'your organization';
+
+    const emailSent = await this.sendInvitationEmail(
+      invitation,
+      rawToken,
+      actorName,
+      null,
+    );
+    if (!emailSent) {
+      throw new BadRequestException(
+        'We could not send the verification email. Please try again later.',
+      );
+    }
+
+    return {
+      email: normalized,
+      emailSent: true,
+      message: 'Verification email sent. Check your inbox.',
+    };
+  }
+
   async createOwnerVerification(
     actorId: string,
     email: string,

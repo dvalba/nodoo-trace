@@ -1,5 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { ActivityTypesService } from '../activity-types/activity-types.service.js';
 import { Actor } from '../actor/entities/actor.entity.js';
@@ -15,10 +14,10 @@ import { ProductNoticeEpc } from '../notices/entities/product-notice-epc.entity.
 import { ProductNoticeAck } from '../notices/entities/product-notice-ack.entity.js';
 import { NoticeType } from '../notices/enums/notice-type.enum.js';
 
-export const DEMO_PASSWORD = 'Demo1234';
+export const SEED_PASSWORD = 'Seed1234';
 
 // Deterministic ids so UI deep links and documentation stay valid on any seed.
-export const DEMO_IDS = {
+export const SEED_IDS = {
   vaccineProduct: '3f2b8c1d-9a4e-4b7c-8d21-6e5f4a3b2c10',
   vaccineBatch: '4a3c9d2e-8b5f-4c6d-9e32-7f6a5b4c3d21',
   insulinProduct: '5b4d0e3f-9c6a-4d7e-8f43-8a7b6c5d4e32',
@@ -28,8 +27,8 @@ export const DEMO_IDS = {
 
 // Cases are the traceable unit: each one is commissioned as an EPC. Pallets
 // are logistics units and are intentionally NOT serialized, so they have no
-// EPC in this demo (and therefore no ledger history).
-export const DEMO_EPC_IDS = {
+// EPC here (and therefore no ledger history).
+export const SEED_EPC_IDS = {
   vaccine: [
     'urn:nodoo:epc:1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
     'urn:nodoo:epc:2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
@@ -41,9 +40,9 @@ export const DEMO_EPC_IDS = {
   ],
 } as const;
 
-export const DEMO_NOTICE_ID = DEMO_IDS.notice;
+export const SEED_NOTICE_ID = SEED_IDS.notice;
 
-interface DemoActor {
+interface SeedActor {
   name: string;
   organizationNumber: string;
   activityCode: string;
@@ -51,31 +50,31 @@ interface DemoActor {
   fullName: string;
 }
 
-const DEMO_ACTORS: DemoActor[] = [
+const SEED_ACTORS: SeedActor[] = [
   {
     name: 'Laboratorios FarmaSur',
     organizationNumber: 'NIT-901020301',
     activityCode: 'manufacturer',
-    email: 'laboratorio@demo.nodoo.local',
+    email: 'laboratorio@seed.nodoo.local',
     fullName: 'Dra. Elena Ríos',
   },
   {
     name: 'Distribuidora MediAndes',
     organizationNumber: 'NIT-901020302',
     activityCode: 'wholesaler',
-    email: 'distribuidora@demo.nodoo.local',
+    email: 'distribuidora@seed.nodoo.local',
     fullName: 'Carlos Mejía',
   },
   {
     name: 'Hospital San Rafael',
     organizationNumber: 'NIT-901020303',
     activityCode: 'retailer',
-    email: 'hospital@demo.nodoo.local',
+    email: 'hospital@seed.nodoo.local',
     fullName: 'Dra. Paula Gómez',
   },
 ];
 
-const DEMO_EMAILS = DEMO_ACTORS.map((actor) => actor.email);
+const SEED_EMAILS = SEED_ACTORS.map((actor) => actor.email);
 
 const daysAgo = (days: number, hour = 10, minute = 0): Date => {
   const date = new Date();
@@ -85,56 +84,32 @@ const daysAgo = (days: number, hour = 10, minute = 0): Date => {
 };
 
 @Injectable()
-export class DemoSeedService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(DemoSeedService.name);
+export class SeedService {
+  private readonly logger = new Logger(SeedService.name);
 
   constructor(
-    private readonly config: ConfigService,
     private readonly dataSource: DataSource,
     private readonly activityTypesService: ActivityTypesService,
     private readonly usersService: UsersService,
     private readonly eventLedgerService: EventLedgerService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (!this.config.get('DEMO_SEED')) {
-      return;
-    }
-
-    try {
-      await this.run();
-      this.logger.log(
-        `Demo seed ready. ${DEMO_ACTORS.length} organizations, ` +
-          `password "${DEMO_PASSWORD}" for all demo emails.`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Demo seed failed: ${error instanceof Error ? error.stack : String(error)}`,
-      );
-    }
-  }
-
-  private async run(): Promise<void> {
+  async run(): Promise<void> {
     const actorRepo = this.dataSource.getRepository(Actor);
 
-    const hasDemoActors = (await actorRepo.find()).some((actor) =>
-      DEMO_ACTORS.some((demo) => demo.name === actor.name),
+    const alreadySeeded = (await actorRepo.find()).some((actor) =>
+      SEED_ACTORS.some((seed) => seed.name === actor.name),
     );
-    const legacyDemo = (await this.dataSource.query(
-      "select 1 from users where email like '%@demo.nodoo.local' limit 1",
-    )) as unknown[];
 
-    if (hasDemoActors || legacyDemo.length > 0) {
-      this.logger.log(
-        'Demo data already present, skipping. Run `pnpm db:reset` and restart to load the pharmaceutical demo.',
-      );
+    if (alreadySeeded) {
+      this.logger.log('Seed data already present, skipping.');
       return;
     }
 
     // ── Organizations and owners ────────────────────────────────────────────
-    const manufacturer = await this.seedActor(actorRepo, DEMO_ACTORS[0]);
-    const distributor = await this.seedActor(actorRepo, DEMO_ACTORS[1]);
-    const hospital = await this.seedActor(actorRepo, DEMO_ACTORS[2]);
+    const manufacturer = await this.seedActor(actorRepo, SEED_ACTORS[0]);
+    const distributor = await this.seedActor(actorRepo, SEED_ACTORS[1]);
+    const hospital = await this.seedActor(actorRepo, SEED_ACTORS[2]);
 
     // ── Catalog (fixed ids so UI deep links stay valid across seeds) ────────
     const productRepo = this.dataSource.getRepository(Product);
@@ -142,7 +117,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
 
     const vaccineProduct = await productRepo.save(
       productRepo.create({
-        id: DEMO_IDS.vaccineProduct,
+        id: SEED_IDS.vaccineProduct,
         createdByActorId: manufacturer.id,
         sku: 'VAC-FLU-05',
         name: 'Vacuna antigripal 0.5 mL',
@@ -150,7 +125,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
     );
     const vaccineBatch = await batchRepo.save(
       batchRepo.create({
-        id: DEMO_IDS.vaccineBatch,
+        id: SEED_IDS.vaccineBatch,
         productId: vaccineProduct.id,
         batchCode: 'LOTE-VAC-2026-1117-A',
       }),
@@ -158,7 +133,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
 
     const insulinProduct = await productRepo.save(
       productRepo.create({
-        id: DEMO_IDS.insulinProduct,
+        id: SEED_IDS.insulinProduct,
         createdByActorId: manufacturer.id,
         sku: 'INS-GLA-100',
         name: 'Insulina glargina 100 UI/mL',
@@ -166,7 +141,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
     );
     const insulinBatch = await batchRepo.save(
       batchRepo.create({
-        id: DEMO_IDS.insulinBatch,
+        id: SEED_IDS.insulinBatch,
         productId: insulinProduct.id,
         batchCode: 'LOTE-INS-2026-1117-B',
       }),
@@ -176,7 +151,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
     // Each case is commissioned as an EPC. The pallets that group them are
     // not serialized, so they deliberately do not appear in the ledger.
     const vaccineCases = [];
-    for (let i = 0; i < DEMO_EPC_IDS.vaccine.length; i += 1) {
+    for (let i = 0; i < SEED_EPC_IDS.vaccine.length; i += 1) {
       vaccineCases.push(
         await this.eventLedgerService.commission(manufacturer.id, {
           productId: vaccineProduct.id,
@@ -186,7 +161,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
     }
 
     const insulinCases = [];
-    for (let i = 0; i < DEMO_EPC_IDS.insulin.length; i += 1) {
+    for (let i = 0; i < SEED_EPC_IDS.insulin.length; i += 1) {
       insulinCases.push(
         await this.eventLedgerService.commission(manufacturer.id, {
           productId: insulinProduct.id,
@@ -195,8 +170,8 @@ export class DemoSeedService implements OnApplicationBootstrap {
       );
     }
 
-    await this.reassignEpcIds(vaccineCases, DEMO_EPC_IDS.vaccine);
-    await this.reassignEpcIds(insulinCases, DEMO_EPC_IDS.insulin);
+    await this.reassignEpcIds(vaccineCases, SEED_EPC_IDS.vaccine);
+    await this.reassignEpcIds(insulinCases, SEED_EPC_IDS.insulin);
 
     // The manufacturer ships and invoices every case to the distributor,
     // which receives each case into custody.
@@ -222,7 +197,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
     await this.eventLedgerService.receive(hospital.id, vaccineToHospital);
 
     // One insulin case is invoiced to the hospital but left in transit, so the
-    // demo also shows a case that has not been received yet.
+    // the seed also shows a case that has not been received yet.
     const insulinToHospital = insulinCases[0].id;
     await this.eventLedgerService.ship(distributor.id, insulinToHospital);
     await this.eventLedgerService.invoice(distributor.id, insulinToHospital, {
@@ -236,7 +211,7 @@ export class DemoSeedService implements OnApplicationBootstrap {
       { id: distributor.id, days: 39 },
       { id: hospital.id, days: 38 },
     ]);
-    await this.backdateUsers(DEMO_EMAILS, 39);
+    await this.backdateUsers(SEED_EMAILS, 39);
     await this.backdateEpcEvents([
       { ids: vaccineCases.map((item) => item.id), days: 36 },
       { ids: insulinCases.map((item) => item.id), days: 30 },
@@ -253,32 +228,32 @@ export class DemoSeedService implements OnApplicationBootstrap {
       vaccineBatch.id,
       [distributor.id, hospital.id],
     );
-    await this.backdateNotice(DEMO_NOTICE_ID, 2);
+    await this.backdateNotice(SEED_NOTICE_ID, 2);
 
     this.logger.log(
-      `Demo cases: vaccine ${vaccineCases.map((item) => item.id).join(', ')}; ` +
+      `Seeded cases: vaccine ${vaccineCases.map((item) => item.id).join(', ')}; ` +
         `insulin ${insulinCases.map((item) => item.id).join(', ')}`,
     );
   }
 
-  private async seedActor(actorRepo: Repository<Actor>, demo: DemoActor) {
+  private async seedActor(actorRepo: Repository<Actor>, seed: SeedActor) {
     const activities = await this.activityTypesService.findWithOperationsByCodes(
-      [demo.activityCode],
+      [seed.activityCode],
     );
 
     const actor = await actorRepo.save(
       actorRepo.create({
-        name: demo.name,
-        organizationNumber: demo.organizationNumber,
+        name: seed.name,
+        organizationNumber: seed.organizationNumber,
         status: ActorStatus.APPROVED,
         activities,
       }),
     );
 
     await this.usersService.createUser({
-      email: demo.email,
-      password: DEMO_PASSWORD,
-      fullName: demo.fullName,
+      email: seed.email,
+      password: SEED_PASSWORD,
+      fullName: seed.fullName,
       actorId: actor.id,
       platformRoles: [PlatformRole.USER],
       roles: [UserRole.OWNER],
@@ -373,13 +348,13 @@ export class DemoSeedService implements OnApplicationBootstrap {
     ackActorIds: string[],
   ): Promise<void> {
     const affectedEpcIds = [
-      DEMO_EPC_IDS.vaccine[0],
-      DEMO_EPC_IDS.vaccine[1],
+      SEED_EPC_IDS.vaccine[0],
+      SEED_EPC_IDS.vaccine[1],
     ];
     await this.dataSource.transaction(async (manager) => {
       await manager.save(
         manager.create(ProductNotice, {
-          id: DEMO_NOTICE_ID,
+          id: SEED_NOTICE_ID,
           productId,
           batchId,
           type: NoticeType.RECALL,
@@ -394,13 +369,13 @@ export class DemoSeedService implements OnApplicationBootstrap {
       );
       await manager.save(
         affectedEpcIds.map((epcId) =>
-          manager.create(ProductNoticeEpc, { noticeId: DEMO_NOTICE_ID, epcId }),
+          manager.create(ProductNoticeEpc, { noticeId: SEED_NOTICE_ID, epcId }),
         ),
       );
       await manager.save(
         ackActorIds.map((ackActorId) =>
           manager.create(ProductNoticeAck, {
-            noticeId: DEMO_NOTICE_ID,
+            noticeId: SEED_NOTICE_ID,
             actorId: ackActorId,
           }),
         ),

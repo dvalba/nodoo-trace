@@ -5,10 +5,9 @@ export enum PlatformRole {
 
 export enum UserRole {
   OWNER = 'owner',
-  // ADMIN = 'admin',
   MEMBER = 'member',
   VIEWER = 'viewer',
-  ADMIN = "ADMIN",
+  ADMIN = 'admin',
 }
 
 export type MultiTenantRole = PlatformRole | UserRole;
