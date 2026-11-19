@@ -15,17 +15,17 @@ export class ActivityType {
   code: string;
 
   /** Nombre legible para mostrar en la UI (ej. 'Proveedor', 'Fabricante'). */
-  @Column()
+  @Column({ type: 'varchar' })
   name: string;
 
-  @Column()
+  @Column({ type: 'varchar' })
   description: string;
 
-  @Column({ default: true })
+  @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
   /** true para ActivityTypes creadas por un owner desde el onboarding. */
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   isCustom: boolean;
 
   @Column({ type: 'int', generated: 'increment' })

@@ -66,6 +66,15 @@ import { activityLabel } from '../core/labels';
           >
             Organización
           </a>
+          @if (isStaff()) {
+            <a
+              routerLink="/staff"
+              routerLinkActive="is-active"
+              class="nav-item"
+            >
+              Aprobaciones
+            </a>
+          }
         </nav>
 
         <div class="px-3 py-3 border-t border-border">
@@ -117,6 +126,11 @@ import { activityLabel } from '../core/labels';
           <a routerLink="/organization" routerLinkActive="is-active" class="pill">
             Organización
           </a>
+          @if (isStaff()) {
+            <a routerLink="/staff" routerLinkActive="is-active" class="pill">
+              Aprobaciones
+            </a>
+          }
         </nav>
 
         <main class="flex-1 overflow-auto p-4 md:p-6">
@@ -229,6 +243,10 @@ export class Layout implements OnInit {
       .map((activity) => activityLabel(activity.code, activity.name))
       .join(' · ');
   });
+
+  readonly isStaff = computed(
+    () => this.auth.me()?.user.platformRoles.includes('staff') ?? false,
+  );
 
   ngOnInit(): void {
     this.auth

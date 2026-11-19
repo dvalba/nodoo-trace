@@ -20,6 +20,7 @@ function makeEvent(
     type: EventType.OBJECT,
     bizStep: null,
     bizTransactionType: null,
+    disposition: null,
     actorId: ACTOR,
     batchId: null,
     eventTime: EVENT_TIME,

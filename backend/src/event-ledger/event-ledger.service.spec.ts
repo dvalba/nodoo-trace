@@ -6,6 +6,7 @@ import { TwinProjector } from './twin-projector.js';
 import { Epc } from './entities/epc.entity.js';
 import { Batch } from '../products/entities/batch.entity.js';
 import { EventEpc } from './entities/event-epc.entity.js';
+import { Actor } from '../actor/entities/actor.entity.js';
 import { BizStep } from './epics-core/enums/biz-step.enum.js';
 import { EventType } from './epics-core/enums/event-type.enum.js';
 import { EventEpcRole } from './enums/event-epc-role.enum.js';
@@ -28,6 +29,7 @@ interface LinkOptions {
 
 function makeLink(options: LinkOptions) {
   return {
+    epcId: EPC_ID,
     role: options.role,
     event: {
       id: options.id,
@@ -67,6 +69,7 @@ function makeService(epc: Partial<Epc> | null, links: unknown[]) {
     { findOne } as unknown as Repository<Epc>,
     {} as Repository<Batch>,
     { createQueryBuilder } as unknown as Repository<EventEpc>,
+    {} as Repository<Actor>,
   );
 
   return { service, findOne, createQueryBuilder, builder };
@@ -130,7 +133,13 @@ describe('EventLedgerService.getHistory', () => {
     });
     expect(builder.orderBy).toHaveBeenCalledWith('event.eventTime', 'ASC');
     expect(builder.addOrderBy).toHaveBeenCalledWith('event.id', 'ASC');
-    expect(history).toEqual([{ role: link.role, ...link.event }]);
+    expect(history).toEqual([
+      {
+        role: link.role,
+        ...link.event,
+        epcs: [{ id: EPC_ID, role: link.role }],
+      },
+    ]);
   });
 
   it('gives the owner and the producer the full history', async () => {
@@ -162,7 +171,7 @@ describe('EventLedgerService.getHistory', () => {
     expect(history.map((entry) => entry.id)).toEqual(['3', '4', '5']);
   });
 
-  it('limits the current custodian to their window', async () => {
+  it('gives the current custodian the full history', async () => {
     const { service } = makeService(
       {
         ownerActorId: PRODUCER,
@@ -174,7 +183,7 @@ describe('EventLedgerService.getHistory', () => {
 
     const history = await service.getHistory(CUSTODIAN_C, EPC_ID);
 
-    expect(history.map((entry) => entry.id)).toEqual(['5']);
+    expect(history.map((entry) => entry.id)).toEqual(['1', '2', '3', '4', '5']);
   });
 
   it('hides the history from actors with no custody relation', async () => {

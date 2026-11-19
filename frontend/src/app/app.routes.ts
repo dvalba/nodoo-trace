@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { Layout } from './layout/layout';
-import { authGuard } from './core/auth.guard';
+import { authGuard, staffGuard } from './core/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
@@ -35,6 +35,11 @@ export const routes: Routes = [
         path: 'organization',
         loadComponent: () =>
           import('./pages/organization/organization').then((m) => m.Organization),
+      },
+      {
+        path: 'staff',
+        canActivate: [staffGuard],
+        loadComponent: () => import('./pages/staff/staff').then((m) => m.Staff),
       },
     ],
   },

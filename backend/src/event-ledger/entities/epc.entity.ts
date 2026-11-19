@@ -13,6 +13,7 @@ import { EpcStatus } from '../epics-core/enums/epc-status.enum.js';
 @Index(['ownerActorId'])
 @Index(['custodianActorId'])
 @Index(['producerActorId'])
+@Index(['destinationActorId'])
 export class Epc {
   @PrimaryColumn({ type: 'text' })
   id: string;
@@ -42,6 +43,9 @@ export class Epc {
 
   @Column({ name: 'custodian_actor_id', type: 'uuid', nullable: true })
   custodianActorId: string | null;
+
+  @Column({ name: 'destination_actor_id', type: 'uuid', nullable: true })
+  destinationActorId: string | null;
 
   @Column({ type: 'enum', enum: EpcStatus, default: EpcStatus.ACTIVE })
   status: EpcStatus;

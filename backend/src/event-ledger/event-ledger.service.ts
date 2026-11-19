@@ -7,8 +7,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { throwNotFound } from '../common/helpers/crud-exceptions.helper.js';
+import { Actor } from '../actor/entities/actor.entity.js';
+import { ActorStatus } from '../actor/enums/actor-status.enum.js';
 import { ProductsService } from '../products/products.service.js';
 import { Batch } from '../products/entities/batch.entity.js';
+import { Product } from '../products/entities/product.entity.js';
 import { BizStep } from './epics-core/enums/biz-step.enum.js';
 import { BizTransactionType } from './epics-core/enums/biz-transaction-type.enum.js';
 import { EpcStatus } from './epics-core/enums/epc-status.enum.js';
@@ -22,6 +25,10 @@ import { CommissionEpcDto } from './dto/commission-epc.dto.js';
 import { InvoiceEpcDto } from './dto/invoice-epc.dto.js';
 import { AggregateEpcDto } from './dto/aggregate-epc.dto.js';
 import { TransformEpcsDto } from './dto/transform-epcs.dto.js';
+import { ShipEpcDto } from './dto/ship-epc.dto.js';
+import { InspectEpcDto } from './dto/inspect-epc.dto.js';
+import { TransactionEpcDto } from './dto/transaction-epc.dto.js';
+import { AssociateEpcDto } from './dto/associate-epc.dto.js';
 import {
   TwinProjector,
   type ProjectableLink,
@@ -81,6 +88,12 @@ export interface EpcHistoryEntry {
   source: string;
   eventUid: string | null;
   payload: Record<string, unknown>;
+  epcs: { id: string; role: EventEpcRole }[];
+}
+
+export interface EpcSearchResult {
+  cases: Epc[];
+  items: { product: Product; batches: Batch[] }[];
 }
 
 @Injectable()
@@ -95,6 +108,8 @@ export class EventLedgerService {
     private readonly batchRepo: Repository<Batch>,
     @InjectRepository(EventEpc)
     private readonly eventEpcRepo: Repository<EventEpc>,
+    @InjectRepository(Actor)
+    private readonly actorRepo: Repository<Actor>,
   ) {}
 
   async commission(actorId: string, dto: CommissionEpcDto): Promise<Epc> {
@@ -204,7 +219,18 @@ export class EventLedgerService {
     });
   }
 
-  async ship(actorId: string, epcId: string): Promise<Epc> {
+  async ship(actorId: string, epcId: string, dto: ShipEpcDto): Promise<Epc> {
+    const destination = await this.actorRepo.findOneBy({
+      id: dto.destinationActorId,
+      status: ActorStatus.APPROVED,
+    });
+
+    if (!destination) {
+      throw new BadRequestException(
+        'The destination actor must be an approved organization.',
+      );
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const [epc] = await this.findCustodiedEpcs(manager, actorId, [epcId]);
 
@@ -226,6 +252,7 @@ export class EventLedgerService {
             batchId: epc.batchId,
             readPointId: null,
             actorId,
+            destinationActorId: destination.id,
           },
         },
         links: [{ epcId, role: EventEpcRole.OBSERVED }],
@@ -279,11 +306,88 @@ export class EventLedgerService {
     });
   }
 
+  async registerBusinessTransaction(
+    actorId: string,
+    epcId: string,
+    bizTransactionType: BizTransactionType,
+    dto: TransactionEpcDto,
+  ): Promise<Epc> {
+    return this.dataSource.transaction(async (manager) => {
+      const epc = await this.findReadableEpc(manager, actorId, epcId);
+
+      const [updated] = await this.append(manager, {
+        draft: {
+          type: EventType.TRANSACTION,
+          bizStep: null,
+          bizTransactionType,
+          bizTransactionId: dto.bizTransactionId,
+          actorId,
+          batchId: epc.batchId,
+          disposition: null,
+          payload: {
+            type: EventType.TRANSACTION,
+            bizTransactionType,
+            bizTransactionId: dto.bizTransactionId,
+            epcList: [epcId],
+            batchId: epc.batchId,
+            readPointId: null,
+            actorId,
+          },
+        },
+        links: [{ epcId, role: EventEpcRole.OBSERVED }],
+        reloadIds: [epcId],
+      });
+
+      return updated;
+    });
+  }
+
+  async inspect(
+    actorId: string,
+    epcId: string,
+    dto: InspectEpcDto,
+  ): Promise<Epc> {
+    const status =
+      dto.result === 'failed' ? EpcStatus.DAMAGED : EpcStatus.ACTIVE;
+
+    return this.dataSource.transaction(async (manager) => {
+      const [epc] = await this.findCustodiedEpcs(manager, actorId, [epcId]);
+
+      const [updated] = await this.append(manager, {
+        draft: {
+          type: EventType.OBJECT,
+          bizStep: BizStep.INSPECTING,
+          bizTransactionType: null,
+          bizTransactionId: null,
+          actorId,
+          batchId: epc.batchId,
+          disposition: status,
+          payload: {
+            type: EventType.OBJECT,
+            bizStep: BizStep.INSPECTING,
+            disposition: status,
+            action: EventAction.OBSERVE,
+            epcList: [epcId],
+            batchId: epc.batchId,
+            readPointId: null,
+            actorId,
+            result: dto.result,
+          },
+        },
+        links: [{ epcId, role: EventEpcRole.OBSERVED }],
+        reloadIds: [epcId],
+      });
+
+      return updated;
+    });
+  }
+
   async aggregate(
     actorId: string,
     parentId: string,
     dto: AggregateEpcDto,
     action: EventAction.ADD | EventAction.DELETE,
+    bizStep: BizStep | null = null,
   ): Promise<Epc[]> {
     const childIds = [...new Set(dto.childEpcs)];
 
@@ -306,7 +410,7 @@ export class EventLedgerService {
       return this.append(manager, {
         draft: {
           type: EventType.AGGREGATION,
-          bizStep: null,
+          bizStep,
           bizTransactionType: null,
           bizTransactionId: null,
           actorId,
@@ -314,6 +418,7 @@ export class EventLedgerService {
           disposition: null,
           payload: {
             type: EventType.AGGREGATION,
+            ...(bizStep ? { bizStep } : {}),
             action,
             parentID: parentId,
             childEPCs: childIds,
@@ -332,6 +437,22 @@ export class EventLedgerService {
         reloadIds: childIds,
       });
     });
+  }
+
+  async associate(
+    actorId: string,
+    epcId: string,
+    dto: AssociateEpcDto,
+  ): Promise<Epc> {
+    return this.applyAssociation(actorId, epcId, dto, EventAction.ADD);
+  }
+
+  async disassociate(
+    actorId: string,
+    epcId: string,
+    dto: AssociateEpcDto,
+  ): Promise<Epc> {
+    return this.applyAssociation(actorId, epcId, dto, EventAction.DELETE);
   }
 
   async transform(actorId: string, dto: TransformEpcsDto): Promise<Epc[]> {
@@ -401,7 +522,7 @@ export class EventLedgerService {
       .innerJoinAndSelect('epc.product', 'product')
       .leftJoinAndSelect('epc.batch', 'batch')
       .where(
-        '(epc.producerActorId = :actorId OR epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId)',
+        '(epc.producerActorId = :actorId OR epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId OR epc.destinationActorId = :actorId)',
         { actorId },
       );
 
@@ -418,12 +539,69 @@ export class EventLedgerService {
     const term = filter.q?.trim();
     if (term) {
       query.andWhere(
-        '(epc.id ILIKE :pattern OR product.sku ILIKE :pattern OR batch.batchCode ILIKE :pattern)',
+        '(epc.id ILIKE :pattern OR product.sku ILIKE :pattern OR product.name ILIKE :pattern OR batch.batchCode ILIKE :pattern)',
         { pattern: `%${term}%` },
       );
     }
 
     return query.orderBy('epc.commissionedAt', 'DESC').getMany();
+  }
+
+  async search(actorId: string, q: string): Promise<EpcSearchResult> {
+    const term = q.trim();
+
+    if (!term) {
+      return { cases: [], items: [] };
+    }
+
+    const cases = await this.listEpc(actorId, { q: term });
+
+    const rows = await this.epcRepo
+      .createQueryBuilder('epc')
+      .where(
+        '(epc.producerActorId = :actorId OR epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId OR epc.destinationActorId = :actorId)',
+        { actorId },
+      )
+      .select('epc.productId', 'productId')
+      .addSelect('epc.batchId', 'batchId')
+      .getRawMany<{ productId: string; batchId: string | null }>();
+
+    const readableProductIds = new Set(
+      rows
+        .map((row) => row.productId)
+        .filter((value): value is string => Boolean(value)),
+    );
+    const readableBatchIds = new Set(
+      rows
+        .map((row) => row.batchId)
+        .filter((value): value is string => Boolean(value)),
+    );
+
+    const [products, batches] = await Promise.all([
+      this.productsService.searchProducts(actorId, term),
+      this.productsService.searchBatches(actorId, term),
+    ]);
+
+    const items = new Map<string, { product: Product; batches: Batch[] }>();
+
+    for (const product of products) {
+      if (!readableProductIds.has(product.id)) {
+        items.set(product.id, { product, batches: [] });
+      }
+    }
+
+    for (const batch of batches) {
+      if (readableBatchIds.has(batch.id)) continue;
+
+      const product =
+        batch.product ??
+        (await this.productsService.findProductById(batch.productId));
+      const item = items.get(product.id) ?? { product, batches: [] };
+      item.batches.push(batch);
+      items.set(product.id, item);
+    }
+
+    return { cases, items: [...items.values()] };
   }
 
   async getEpc(actorId: string, epcId: string): Promise<Epc> {
@@ -446,16 +624,68 @@ export class EventLedgerService {
     const epc = await this.epcRepo.findOne({ where: { id: epcId } });
     if (!epc) throwNotFound('Epc', epcId);
 
-    const history = await this.readHistory(epcId);
-
-    if (epc.ownerActorId === actorId || epc.producerActorId === actorId) {
-      return history;
+    if (this.canRead(epc, actorId)) {
+      return this.readHistory(epcId);
     }
 
+    const history = await this.readHistory(epcId);
     const window = this.custodianWindow(history, actorId);
     if (window.length === 0) throwNotFound('Epc', epcId);
 
     return window;
+  }
+
+  private async applyAssociation(
+    actorId: string,
+    epcId: string,
+    dto: AssociateEpcDto,
+    action: EventAction.ADD | EventAction.DELETE,
+  ): Promise<Epc> {
+    const relatedIds = [...new Set(dto.relatedEpcs)];
+
+    return this.dataSource.transaction(async (manager) => {
+      const [target] = await this.findCustodiedEpcs(manager, actorId, [epcId]);
+
+      const related = await manager.find(Epc, {
+        where: { id: In(relatedIds) },
+      });
+      const relatedById = new Map(related.map((epc) => [epc.id, epc]));
+
+      for (const id of relatedIds) {
+        const epc = relatedById.get(id);
+        if (!epc || !this.canRead(epc, actorId)) throwNotFound('Epc', id);
+      }
+
+      const [updated] = await this.append(manager, {
+        draft: {
+          type: EventType.ASSOCIATION,
+          bizStep: null,
+          bizTransactionType: null,
+          bizTransactionId: null,
+          actorId,
+          batchId: target.batchId,
+          disposition: null,
+          payload: {
+            type: EventType.ASSOCIATION,
+            action,
+            epcList: [epcId],
+            associatedEPCs: relatedIds,
+            readPointId: null,
+            actorId,
+          },
+        },
+        links: [
+          { epcId, role: EventEpcRole.OBSERVED },
+          ...relatedIds.map((id) => ({
+            epcId: id,
+            role: EventEpcRole.ASSOCIATED,
+          })),
+        ],
+        reloadIds: [epcId],
+      });
+
+      return updated;
+    });
   }
 
   private async readHistory(epcId: string): Promise<EpcHistoryEntry[]> {
@@ -467,7 +697,26 @@ export class EventLedgerService {
       .addOrderBy('event.id', 'ASC')
       .getMany();
 
-    return links.map((link) => this.toHistoryEntry(link));
+    const eventIds = [...new Set(links.map((link) => link.eventId))];
+
+    if (eventIds.length === 0) return [];
+
+    const allLinks = await this.eventEpcRepo
+      .createQueryBuilder('link')
+      .where('link.eventId IN (:...eventIds)', { eventIds })
+      .getMany();
+
+    const epcsByEvent = new Map<string, { id: string; role: EventEpcRole }[]>();
+    for (const link of allLinks) {
+      const list = epcsByEvent.get(link.eventId) ?? [];
+      list.push({ id: link.epcId, role: link.role });
+      epcsByEvent.set(link.eventId, list);
+    }
+
+    return links.map((link) => ({
+      ...this.toHistoryEntry(link),
+      epcs: epcsByEvent.get(link.eventId) ?? [{ id: link.epcId, role: link.role }],
+    }));
   }
 
   private custodianWindow(
@@ -527,6 +776,7 @@ export class EventLedgerService {
       source: event.source,
       eventUid: event.eventUid,
       payload: event.payload,
+      epcs: [{ id: link.epcId, role: link.role }],
     };
   }
 
@@ -562,6 +812,7 @@ export class EventLedgerService {
         type: options.draft.type,
         bizStep: options.draft.bizStep,
         bizTransactionType: options.draft.bizTransactionType,
+        disposition: options.draft.disposition,
         actorId: options.draft.actorId,
         batchId: options.draft.batchId,
         eventTime,
@@ -643,6 +894,9 @@ export class EventLedgerService {
     if (mutation.custodianActorId !== undefined) {
       patch.custodianActorId = mutation.custodianActorId;
     }
+    if (mutation.destinationActorId !== undefined) {
+      patch.destinationActorId = mutation.destinationActorId;
+    }
     if (mutation.status !== undefined) patch.status = mutation.status;
 
     if (Object.keys(patch).length === 0) return;
@@ -659,10 +913,23 @@ export class EventLedgerService {
       where: [
         { id: epcId, ownerActorId: actorId },
         { id: epcId, custodianActorId: actorId },
+        { id: epcId, destinationActorId: actorId },
       ],
     });
 
     if (!epc) throwNotFound('Epc', epcId);
+
+    return epc;
+  }
+
+  private async findReadableEpc(
+    manager: EntityManager,
+    actorId: string,
+    epcId: string,
+  ): Promise<Epc> {
+    const epc = await manager.findOne(Epc, { where: { id: epcId } });
+
+    if (!epc || !this.canRead(epc, actorId)) throwNotFound('Epc', epcId);
 
     return epc;
   }
@@ -694,7 +961,8 @@ export class EventLedgerService {
     return (
       epc.ownerActorId === actorId ||
       epc.custodianActorId === actorId ||
-      epc.producerActorId === actorId
+      epc.producerActorId === actorId ||
+      epc.destinationActorId === actorId
     );
   }
 }

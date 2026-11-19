@@ -32,26 +32,31 @@ interface CreatedCase {
 
       <section class="card">
         <h2 class="text-sm font-semibold mb-3">Paso 1 · Crea un producto</h2>
-        <form (ngSubmit)="createProduct()" class="grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end">
-          <div>
-            <label class="block text-sm mb-1" for="sku">SKU</label>
-            <input
-              id="sku"
-              name="sku"
-              [(ngModel)]="sku"
-              class="field"
-              placeholder="VAC-FLU-05"
-            />
-          </div>
+        <form (ngSubmit)="createProduct()" class="grid gap-3 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
           <div>
             <label class="block text-sm mb-1" for="name">Nombre</label>
             <input
               id="name"
               name="name"
               [(ngModel)]="name"
+              (ngModelChange)="onNameInput()"
               class="field"
               placeholder="Vacuna antigripal 0.5 mL"
             />
+          </div>
+          <div>
+            <label class="block text-sm mb-1" for="sku">SKU</label>
+            <input
+              id="sku"
+              name="sku"
+              [(ngModel)]="sku"
+              (ngModelChange)="skuTouched = true"
+              class="field font-mono text-xs"
+              placeholder="VAC-ANTIGRIPAL-05ML"
+            />
+            <p class="text-[11px] text-mut mt-1">
+              Se genera desde el nombre; puedes editarlo.
+            </p>
           </div>
           <button type="submit" [disabled]="productBusy()" class="btn-primary">
             {{ productBusy() ? 'Creando…' : 'Crear producto' }}
@@ -128,12 +133,11 @@ interface CreatedCase {
                   </div>
                   @if (!canCommission()) {
                     <p class="text-xs text-mut">
-                      Tu actividad no incluye crear identidades de producto
-                      (comisionar). Puedes preparar catálogo y lotes, pero no
-                      generar casos.
+                      Tu actividad no incluye comisionar identidades, así que
+                      aquí no puedes generar casos. Prepara catálogo y lotes,
+                      y entra los casos como «Recibir» (o con orden de compra)
+                      desde la página de Trazabilidad.
                     </p>
-                  } @else if (row.batches.length === 0) {
-                    <p class="text-xs text-mut">Crea un lote para poder generar casos.</p>
                   } @else {
                     <div class="flex flex-wrap gap-2">
                       <select
@@ -141,6 +145,7 @@ interface CreatedCase {
                         [name]="'case-batch-' + row.product.id"
                         class="field"
                       >
+                        <option value="">Sin lote</option>
                         @for (batch of row.batches; track batch.id) {
                           <option [value]="batch.id">{{ batch.batchCode }}</option>
                         }
@@ -184,7 +189,8 @@ interface CreatedCase {
               <button type="button" class="case-row" (click)="goToTrace(item.urn)">
                 <span class="font-mono text-xs">{{ short(item.urn) }}</span>
                 <span class="text-xs text-mut">
-                  {{ item.productName }} · {{ item.batchCode }}
+                  {{ item.productName }}
+                  · {{ item.batchCode || 'Sin lote' }}
                 </span>
               </button>
             }
@@ -279,6 +285,7 @@ export class Products implements OnInit {
 
   sku = '';
   name = '';
+  skuTouched = false;
   readonly productBusy = signal(false);
   readonly productError = signal<string | null>(null);
 
@@ -306,11 +313,32 @@ export class Products implements OnInit {
     return this.myOperations().has('object:commissioning');
   }
 
+  onNameInput(): void {
+    if (!this.skuTouched) {
+      this.sku = this.slugFromName(this.name);
+    }
+  }
+
+  private slugFromName(name: string): string {
+    return name
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48);
+  }
+
   createProduct(): void {
-    const sku = this.sku.trim();
     const name = this.name.trim();
-    if (!sku || !name) {
-      this.productError.set('Completa el SKU y el nombre del producto.');
+    if (!name) {
+      this.productError.set('Completa el nombre del producto.');
+      return;
+    }
+
+    const sku = this.sku.trim() || this.slugFromName(name);
+    if (!sku) {
+      this.productError.set('Completa el SKU del producto.');
       return;
     }
 
@@ -349,15 +377,13 @@ export class Products implements OnInit {
   }
 
   async commission(product: Product): Promise<void> {
-    const batchId = this.caseBatch[product.id];
-    if (!batchId) {
-      this.caseError.set('Crea un lote antes de generar casos.');
-      return;
-    }
+    const batchId = this.caseBatch[product.id] || undefined;
 
-    const batch = this.rows()
-      .find((row) => row.product.id === product.id)
-      ?.batches.find((item) => item.id === batchId);
+    const batch = batchId
+      ? this.rows()
+          .find((row) => row.product.id === product.id)
+          ?.batches.find((item) => item.id === batchId)
+      : undefined;
 
     const count = Math.max(
       1,

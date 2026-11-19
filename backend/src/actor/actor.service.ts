@@ -24,6 +24,30 @@ export class ActorService {
     return this.actorRepo.findOneBy({ id });
   }
 
+  async listApproved(): Promise<{ id: string; name: string }[]> {
+    const actors = await this.actorRepo.find({
+      where: { status: ActorStatus.APPROVED },
+      order: { name: 'ASC' },
+    });
+
+    return actors.map((actor) => ({ id: actor.id, name: actor.name }));
+  }
+
+  async listPending(): Promise<
+    { id: string; name: string; organizationNumber: string | null }[]
+  > {
+    const actors = await this.actorRepo.find({
+      where: { status: ActorStatus.PENDING_APPROVAL },
+      order: { name: 'ASC' },
+    });
+
+    return actors.map((actor) => ({
+      id: actor.id,
+      name: actor.name,
+      organizationNumber: actor.organizationNumber ?? null,
+    }));
+  }
+
   async findByIdWithActivities(id: string) {
     return this.actorRepo.findOne({
       where: { id },

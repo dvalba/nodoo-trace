@@ -10,6 +10,7 @@ export interface ProjectableEvent {
   type: EventType;
   bizStep: BizStep | null;
   bizTransactionType: string | null;
+  disposition: EpcStatus | null;
   actorId: string;
   batchId: string | null;
   eventTime: Date;
@@ -30,6 +31,7 @@ export interface TwinMutation {
   producerActorId?: string;
   ownerActorId?: string | null;
   custodianActorId?: string | null;
+  destinationActorId?: string | null;
   status?: EpcStatus;
   commissionedAt?: Date;
 }
@@ -110,13 +112,26 @@ export class TwinProjector {
         for (const id of observed) {
           set(id, {
             custodianActorId: event.actorId,
+            destinationActorId: null,
             status: EpcStatus.ACTIVE,
           });
         }
         break;
-      case BizStep.SHIPPING:
+      case BizStep.SHIPPING: {
+        const destination = this.readString(event.payload, 'destinationActorId');
         for (const id of observed) {
-          set(id, { status: EpcStatus.IN_TRANSIT });
+          set(id, {
+            status: EpcStatus.IN_TRANSIT,
+            ...(destination ? { destinationActorId: destination } : {}),
+          });
+        }
+        break;
+      }
+      case BizStep.INSPECTING:
+        for (const id of observed) {
+          if (event.disposition) {
+            set(id, { status: event.disposition });
+          }
         }
         break;
       default:

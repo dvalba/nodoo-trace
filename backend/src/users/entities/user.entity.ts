@@ -23,13 +23,13 @@ import type { Relation } from 'typeorm';
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-  @Column({ unique: true })
+  @Column({ type: 'varchar', unique: true })
   email: string;
 
-  @Column({ select: false })
+  @Column({ type: 'varchar', select: false })
   passwordHash: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   fullName: string;
 
   @Column({
@@ -55,7 +55,7 @@ export class User {
   })
   status: UserStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   actorId: string;
 
   @ManyToOne(() => Actor, (actor) => actor.users, {

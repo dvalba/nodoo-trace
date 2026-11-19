@@ -177,7 +177,9 @@ export class SeedService {
     // which receives each case into custody.
     for (const cases of [vaccineCases, insulinCases]) {
       for (const item of cases) {
-        await this.eventLedgerService.ship(manufacturer.id, item.id);
+        await this.eventLedgerService.ship(manufacturer.id, item.id, {
+          destinationActorId: distributor.id,
+        });
         await this.eventLedgerService.invoice(manufacturer.id, item.id, {
           bizTransactionId: 'INV-2026-0001',
           ownershipTransferTo: distributor.id,
@@ -189,7 +191,9 @@ export class SeedService {
     // The distributor forwards one vaccine case to the hospital and it is
     // received there.
     const vaccineToHospital = vaccineCases[0].id;
-    await this.eventLedgerService.ship(distributor.id, vaccineToHospital);
+    await this.eventLedgerService.ship(distributor.id, vaccineToHospital, {
+      destinationActorId: hospital.id,
+    });
     await this.eventLedgerService.invoice(distributor.id, vaccineToHospital, {
       bizTransactionId: 'INV-2026-0002',
       ownershipTransferTo: hospital.id,
@@ -199,7 +203,9 @@ export class SeedService {
     // One insulin case is invoiced to the hospital but left in transit, so the
     // the seed also shows a case that has not been received yet.
     const insulinToHospital = insulinCases[0].id;
-    await this.eventLedgerService.ship(distributor.id, insulinToHospital);
+    await this.eventLedgerService.ship(distributor.id, insulinToHospital, {
+      destinationActorId: hospital.id,
+    });
     await this.eventLedgerService.invoice(distributor.id, insulinToHospital, {
       bizTransactionId: 'INV-2026-0003',
       ownershipTransferTo: hospital.id,

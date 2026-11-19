@@ -6,11 +6,14 @@ import type {
   AcceptActivitiesResponse,
   ActivityType,
   ActorRef,
+  ActorSummary,
+  ApproveActorResult,
   Batch,
   CreateNoticePayload,
   CustomActivityResponse,
   Epc,
   EpcHistoryEntry,
+  EpcSearchResult,
   Invitation,
   InvitationActionResult,
   InvitationPreview,
@@ -20,6 +23,7 @@ import type {
   NoticeAck,
   Operation,
   OperationSuggestion,
+  PendingActor,
   Product,
   UserRole,
 } from './models';
@@ -98,9 +102,12 @@ export class Api {
     return this.req(this.http.post<Epc>(`${BASE}/epcs`, payload));
   }
 
-  shipEpc(epcId: string): Promise<Epc> {
+  shipEpc(epcId: string, payload: { destinationActorId: string }): Promise<Epc> {
     return this.req(
-      this.http.post<Epc>(`${BASE}/epcs/${encodeURIComponent(epcId)}/ship`, {}),
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/ship`,
+        payload,
+      ),
     );
   }
 
@@ -122,6 +129,127 @@ export class Api {
         `${BASE}/epcs/${encodeURIComponent(epcId)}/invoice`,
         payload,
       ),
+    );
+  }
+
+  purchaseOrderEpc(
+    epcId: string,
+    payload: { bizTransactionId: string },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/purchase-order`,
+        payload,
+      ),
+    );
+  }
+
+  despatchAdviceEpc(
+    epcId: string,
+    payload: { bizTransactionId: string },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/despatch-advice`,
+        payload,
+      ),
+    );
+  }
+
+  billOfLadingEpc(
+    epcId: string,
+    payload: { bizTransactionId: string },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/bill-of-lading`,
+        payload,
+      ),
+    );
+  }
+
+  inspectEpc(
+    epcId: string,
+    payload: { result: 'passed' | 'failed' },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/inspect`,
+        payload,
+      ),
+    );
+  }
+
+  aggregateEpc(
+    epcId: string,
+    payload: { childEpcs: string[] },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/aggregate`,
+        payload,
+      ),
+    );
+  }
+
+  disaggregateEpc(
+    epcId: string,
+    payload: { childEpcs: string[] },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/disaggregate`,
+        payload,
+      ),
+    );
+  }
+
+  packEpc(epcId: string, payload: { childEpcs: string[] }): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/pack`,
+        payload,
+      ),
+    );
+  }
+
+  unpackEpc(epcId: string, payload: { childEpcs: string[] }): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/unpack`,
+        payload,
+      ),
+    );
+  }
+
+  associateEpc(
+    epcId: string,
+    payload: { relatedEpcs: string[] },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/associate`,
+        payload,
+      ),
+    );
+  }
+
+  disassociateEpc(
+    epcId: string,
+    payload: { relatedEpcs: string[] },
+  ): Promise<Epc> {
+    return this.req(
+      this.http.post<Epc>(
+        `${BASE}/epcs/${encodeURIComponent(epcId)}/disassociate`,
+        payload,
+      ),
+    );
+  }
+
+  searchEpcs(q: string): Promise<EpcSearchResult> {
+    const query = q ? `?q=${encodeURIComponent(q)}` : '';
+    return this.req(
+      this.http.get<EpcSearchResult>(`${BASE}/epcs/search${query}`),
     );
   }
 
@@ -242,6 +370,25 @@ export class Api {
 
   getActor(actorId: string): Promise<ActorRef> {
     return this.req(this.http.get<ActorRef>(`${BASE}/actors/${actorId}`));
+  }
+
+  listActors(): Promise<ActorSummary[]> {
+    return this.req(this.http.get<ActorSummary[]>(`${BASE}/actors`));
+  }
+
+  listPendingActors(): Promise<PendingActor[]> {
+    return this.req(
+      this.http.get<PendingActor[]>(`${BASE}/admin/actors/pending`),
+    );
+  }
+
+  approveActor(actorId: string): Promise<ApproveActorResult> {
+    return this.req(
+      this.http.patch<ApproveActorResult>(
+        `${BASE}/admin/actors/${encodeURIComponent(actorId)}/approval`,
+        {},
+      ),
+    );
   }
 
   private req<T>(obs: Observable<T>): Promise<T> {

@@ -13,6 +13,7 @@ import { Auth } from '../../core/auth.service';
 import { Directory } from '../../core/directory.service';
 import type {
   Batch,
+  Epc,
   Notice,
   NoticeAck,
   NoticeType,
@@ -105,15 +106,20 @@ import type {
               </div>
               <div>
                 <label class="block text-sm mb-1" for="epcIds">
-                  EPCs afectados <span class="text-mut">(separados por coma)</span>
+                  Casos afectados <span class="text-mut">(Ctrl/⌘ para varios)</span>
                 </label>
-                <input
+                <select
                   id="epcIds"
                   name="epcIds"
-                  [(ngModel)]="newNotice.epcIds"
+                  multiple
+                  [(ngModel)]="selectedCaseIds"
                   class="field font-mono text-xs"
-                  placeholder="urn:nodoo:epc:…, urn:nodoo:epc:…"
-                />
+                  size="4"
+                >
+                  @for (epc of myCases(); track epc.id) {
+                    <option [value]="epc.id">{{ short(urn(epc)) }}</option>
+                  }
+                </select>
               </div>
             </div>
 
@@ -319,14 +325,15 @@ export class Notices implements OnInit, AfterViewChecked {
     title: string;
     description: string;
     batchId: string;
-    epcIds: string;
   } = {
     type: 'advisory',
     title: '',
     description: '',
     batchId: '',
-    epcIds: '',
   };
+
+  selectedCaseIds: string[] = [];
+  readonly myCases = signal<Epc[]>([]);
 
   private readonly resolvedActors = new Set<string>();
 
@@ -392,13 +399,10 @@ export class Notices implements OnInit, AfterViewChecked {
       return;
     }
 
-    const epcIds = this.newNotice.epcIds
-      .split(/[\s,]+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const epcIds = [...this.selectedCaseIds];
 
     if (!this.newNotice.batchId && epcIds.length === 0) {
-      this.createError.set('Indica un lote o al menos un EPC afectado.');
+      this.createError.set('Indica un lote o al menos un caso afectado.');
       return;
     }
 
@@ -419,8 +423,8 @@ export class Notices implements OnInit, AfterViewChecked {
           title: '',
           description: '',
           batchId: '',
-          epcIds: '',
         };
+        this.selectedCaseIds = [];
         this.showCreate.set(false);
         return this.listForProduct(productId).then(() =>
           this.openNotice(created.id),
@@ -500,9 +504,11 @@ export class Notices implements OnInit, AfterViewChecked {
     return Promise.all([
       this.api.listBatches(productId).catch(() => [] as Batch[]),
       this.api.listNotices(productId).catch(() => [] as Notice[]),
-    ]).then(([batches, notices]) => {
+      this.api.listEpcs({ productId }).catch(() => [] as Epc[]),
+    ]).then(([batches, notices, cases]) => {
       this.batches.set(batches);
       this.notices.set(notices);
+      this.myCases.set(cases);
       if (notices.length > 0) {
         this.openNotice(notices[0].id);
       } else {
@@ -510,6 +516,15 @@ export class Notices implements OnInit, AfterViewChecked {
         this.acks.set([]);
       }
     });
+  }
+
+  urn(epc: Epc): string {
+    return epc.id;
+  }
+
+  short(id: string): string {
+    const tail = id.split(':').pop() ?? id;
+    return tail.length > 20 ? `…${tail.slice(-20)}` : tail;
   }
 
   private messageFrom(err: unknown): string {

@@ -90,6 +90,36 @@ export class ProductsService {
     });
   }
 
+  searchProducts(actorId: string, term: string): Promise<Product[]> {
+    return this.productRepo
+      .createQueryBuilder('product')
+      .where('product.createdByActorId = :actorId', { actorId })
+      .andWhere('(product.sku ILIKE :pattern OR product.name ILIKE :pattern)', {
+        pattern: `%${term}%`,
+      })
+      .orderBy('product.name', 'ASC')
+      .getMany();
+  }
+
+  searchBatches(actorId: string, term: string): Promise<Batch[]> {
+    return this.batchRepo
+      .createQueryBuilder('batch')
+      .innerJoin('batch.product', 'product')
+      .where('product.createdByActorId = :actorId', { actorId })
+      .andWhere('batch.batchCode ILIKE :pattern', {
+        pattern: `%${term}%`,
+      })
+      .addSelect('product')
+      .orderBy('batch.batchCode', 'ASC')
+      .getMany();
+  }
+
+  async findProductById(productId: string): Promise<Product> {
+    const product = await this.productRepo.findOneBy({ id: productId });
+    if (!product) throwNotFound('Product', productId);
+    return product;
+  }
+
   private async findOwnedProduct(
     actorId: string,
     productId: string,

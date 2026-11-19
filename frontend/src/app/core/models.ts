@@ -144,6 +144,23 @@ export interface MeResponse {
   actor: ActorRef | null;
 }
 
+export interface ActorSummary {
+  id: string;
+  name: string;
+}
+
+export interface PendingActor {
+  id: string;
+  name: string;
+  organizationNumber: string | null;
+}
+
+export interface ApproveActorResult {
+  actorId: string;
+  actorStatus: ActorStatus;
+  activatedUsers: number;
+}
+
 export interface Product {
   id: string;
   createdByActorId: string;
@@ -178,8 +195,14 @@ export interface Epc {
   producerActorId: string;
   ownerActorId: string | null;
   custodianActorId: string | null;
+  destinationActorId: string | null;
   status: EpcStatus;
   commissionedAt: string;
+}
+
+export interface EpcSearchResult {
+  cases: Epc[];
+  items: { product: Product; batches: Batch[] }[];
 }
 
 export type EventEpcRole =
@@ -225,6 +248,7 @@ export interface EpcHistoryEntry {
   source: string;
   eventUid: string | null;
   payload: Record<string, unknown>;
+  epcs: { id: string; role: EventEpcRole }[];
 }
 
 export type NoticeType = 'recall' | 'advisory';

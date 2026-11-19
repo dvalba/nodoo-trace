@@ -11,14 +11,18 @@ import { Api } from '../../core/api.service';
 import { Auth } from '../../core/auth.service';
 import { Directory } from '../../core/directory.service';
 import type {
+  ActorSummary,
+  Batch,
   BizStep,
   BizTransactionType,
   Epc,
   EpcHistoryEntry,
+  EpcSearchResult,
   EpcStatus,
   EventEpcRole,
   EventType,
   Notice,
+  Product,
 } from '../../core/models';
 
 const STATUS_STYLES: Record<EpcStatus, string> = {
@@ -74,6 +78,11 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
   bol: 'Guía de remisión',
 };
 
+interface SearchItem {
+  product: Product;
+  batches: Batch[];
+}
+
 @Component({
   selector: 'app-trace',
   imports: [FormsModule],
@@ -84,7 +93,7 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
         <p class="text-sm text-mut mt-1">
           Un caso es la caja que quieres rastrear. Consulta su estado, su
           historial completo y los avisos que le afectan. Si no sabes el EPC,
-          elígelo en «Mis casos».
+          búscalo por SKU o lote o elígelo en «Mis casos».
         </p>
       </div>
 
@@ -92,14 +101,14 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
         <div class="flex flex-wrap gap-3 items-end">
           <div class="flex-1 min-w-[240px]">
             <label class="block text-sm mb-1" for="epc">
-              EPC, SKU o lote
+              EPC, SKU, nombre o lote
             </label>
             <input
               id="epc"
               [(ngModel)]="query"
               (keyup.enter)="lookup()"
               class="field font-mono text-xs"
-              placeholder="urn:nodoo:epc:…, SKU o código de lote"
+              placeholder="urn:nodoo:epc:…, SKU, producto o código de lote"
             />
           </div>
           <button
@@ -145,6 +154,35 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                   }
                 </span>
               </button>
+            }
+          </div>
+        </section>
+      }
+
+      @if (searchedItems().length > 0) {
+        <section class="card">
+          <h2 class="text-sm font-semibold mb-3">
+            Existen en tu catálogo, aún sin caso rastreable
+          </h2>
+          <p class="text-xs text-mut mb-3">
+            Estos productos o lotes coinciden con la búsqueda pero todavía no
+            tienen un EPC que puedas consultar.
+          </p>
+          <div class="space-y-2">
+            @for (item of searchedItems(); track item.product.id) {
+              <div class="case-row-static">
+                <span class="text-sm">
+                  {{ item.product.name }}
+                  <span class="text-mut">· {{ item.product.sku }}</span>
+                </span>
+                <span class="text-xs text-mut">
+                  @if (item.batches.length > 0) {
+                    Lotes: {{ item.batches.map((b) => b.batchCode).join(', ') }}
+                  } @else {
+                    Sin lotes
+                  }
+                </span>
+              </div>
             }
           </div>
         </section>
@@ -222,6 +260,18 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
                   <dt class="text-mut text-xs">Custodio</dt>
                   <dd class="mt-0.5">{{ actorName(twin.custodianActorId) }}</dd>
                 </div>
+                @if (twin.destinationActorId) {
+                  <div>
+                    <dt class="text-mut text-xs">Destino</dt>
+                    <dd class="mt-0.5">{{ actorName(twin.destinationActorId) }}</dd>
+                  </div>
+                }
+                @if (twin.parentId) {
+                  <div>
+                    <dt class="text-mut text-xs">Contenedor</dt>
+                    <dd class="mt-0.5 font-mono text-xs">{{ short(twin.parentId) }}</dd>
+                  </div>
+                }
                 <div>
                   <dt class="text-mut text-xs">Comisionado</dt>
                   <dd class="mt-0.5">{{ date(twin.commissionedAt) }}</dd>
@@ -233,61 +283,223 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
               </div>
             </section>
 
-            @if (canShip() || canReceive() || canInvoice()) {
+            @if (anyAction()) {
               <section class="card">
                 <h2 class="text-sm font-semibold mb-1">Acciones disponibles</h2>
-                <p class="text-xs text-mut mb-3">
+                <p class="text-xs text-mut mb-4">
                   Solo se muestran las acciones que tu actividad permite y que
                   corresponden al estado actual del caso.
                 </p>
 
-                <div class="flex flex-wrap gap-2">
-                  @if (canShip()) {
-                    <button type="button" class="btn-primary" [disabled]="acting()" (click)="ship()">
-                      {{ acting() ? 'Procesando…' : 'Enviar caso' }}
-                    </button>
-                  }
-                  @if (canReceive()) {
-                    <button type="button" class="btn-primary" [disabled]="acting()" (click)="receive()">
-                      {{ acting() ? 'Procesando…' : 'Recibir caso' }}
-                    </button>
-                  }
-                </div>
+                @if (canShip() || canReceive() || canInvoice() || canPo() || canDesadv() || canBol()) {
+                  <div class="space-y-4">
+                    <h3 class="text-xs font-semibold text-mut uppercase tracking-wide">Movimiento</h3>
 
-                @if (canInvoice()) {
-                  <div class="mt-3 space-y-2">
-                    <input
-                      [(ngModel)]="invoiceNumber"
-                      name="invoiceNumber"
-                      class="field"
-                      placeholder="Nº de factura, ej. INV-2026-0004"
-                    />
-                    <input
-                      [(ngModel)]="invoiceRecipient"
-                      name="invoiceRecipient"
-                      class="field"
-                      placeholder="UUID del nuevo propietario (opcional)"
-                    />
-                    <button type="button" class="btn-primary" [disabled]="acting()" (click)="invoice()">
-                      {{ acting() ? 'Procesando…' : 'Registrar factura' }}
-                    </button>
+                    @if (canShip()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="shipDest">Enviar a</label>
+                        <select id="shipDest" [(ngModel)]="shipDestination" class="field">
+                          <option value="">— Elige una organización —</option>
+                          @for (dest of shipDestinations; track dest.id) {
+                            <option [value]="dest.id">{{ dest.name }}</option>
+                          }
+                        </select>
+                        <button type="button" class="btn-primary" [disabled]="acting() || !shipDestination" (click)="ship()">
+                          {{ acting() ? 'Procesando…' : 'Enviar caso' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canReceive()) {
+                      <div class="space-y-2">
+                        <button type="button" class="btn-primary" [disabled]="acting()" (click)="receive()">
+                          {{ acting() ? 'Procesando…' : 'Recibir caso' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canInvoice()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="invoiceNumber">Facturar</label>
+                        <input
+                          id="invoiceNumber"
+                          [(ngModel)]="invoiceNumber"
+                          name="invoiceNumber"
+                          class="field"
+                          placeholder="Nº de factura, ej. INV-2026-0004"
+                        />
+                        <input
+                          [(ngModel)]="invoiceRecipient"
+                          name="invoiceRecipient"
+                          class="field"
+                          placeholder="UUID del nuevo propietario (opcional)"
+                        />
+                        <button type="button" class="btn-primary" [disabled]="acting()" (click)="invoice()">
+                          {{ acting() ? 'Procesando…' : 'Registrar factura' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canPo()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="poNumber">Orden de compra</label>
+                        <input
+                          id="poNumber"
+                          [(ngModel)]="poNumber"
+                          name="poNumber"
+                          class="field"
+                          placeholder="Nº de orden de compra, ej. PO-2026-001"
+                        />
+                        <button type="button" class="btn-primary" [disabled]="acting()" (click)="purchaseOrder()">
+                          {{ acting() ? 'Procesando…' : 'Registrar orden de compra' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canDesadv()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="desadvNumber">Aviso de despacho</label>
+                        <input
+                          id="desadvNumber"
+                          [(ngModel)]="desadvNumber"
+                          name="desadvNumber"
+                          class="field"
+                          placeholder="Nº de aviso de despacho"
+                        />
+                        <button type="button" class="btn-primary" [disabled]="acting()" (click)="despatchAdvice()">
+                          {{ acting() ? 'Procesando…' : 'Registrar aviso de despacho' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canBol()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="bolNumber">Guía de remisión</label>
+                        <input
+                          id="bolNumber"
+                          [(ngModel)]="bolNumber"
+                          name="bolNumber"
+                          class="field"
+                          placeholder="Nº de guía de remisión"
+                        />
+                        <button type="button" class="btn-primary" [disabled]="acting()" (click)="billOfLading()">
+                          {{ acting() ? 'Procesando…' : 'Registrar guía de remisión' }}
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (canInspect()) {
+                  <div class="space-y-4 mt-4 pt-4 border-t border-border">
+                    <h3 class="text-xs font-semibold text-mut uppercase tracking-wide">Calidad</h3>
+                    <div class="space-y-2">
+                      <span class="block text-sm">Inspeccionar</span>
+                      <label class="flex items-center gap-2 text-sm">
+                        <input type="radio" name="inspectResult" value="passed" [(ngModel)]="inspectionResult" />
+                        Conforme
+                      </label>
+                      <label class="flex items-center gap-2 text-sm">
+                        <input type="radio" name="inspectResult" value="failed" [(ngModel)]="inspectionResult" />
+                        No conforme
+                      </label>
+                      <button type="button" class="btn-primary" [disabled]="acting()" (click)="inspect()">
+                        {{ acting() ? 'Procesando…' : 'Registrar inspección' }}
+                      </button>
+                    </div>
+                  </div>
+                }
+
+                @if (canPack() || canUnpack()) {
+                  <div class="space-y-4 mt-4 pt-4 border-t border-border">
+                    <h3 class="text-xs font-semibold text-mut uppercase tracking-wide">Empaquetado</h3>
+
+                    @if (canPack()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="packSel">Empacar casos en este contenedor</label>
+                        <select id="packSel" multiple size="4" class="field" [(ngModel)]="packSelection">
+                          @for (cand of packCandidates(); track cand.id) {
+                            <option [value]="cand.id">
+                              {{ short(cand.id) }} · {{ cand.product?.name ?? '' }}
+                            </option>
+                          }
+                        </select>
+                        <p class="text-xs text-mut">Mantén Ctrl/Cmd para seleccionar varios.</p>
+                        <button type="button" class="btn-primary" [disabled]="acting() || packSelection.length === 0" (click)="pack()">
+                          {{ acting() ? 'Procesando…' : 'Empacar' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canUnpack()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="unpackSel">Quitar casos de este contenedor</label>
+                        <select id="unpackSel" multiple size="4" class="field" [(ngModel)]="unpackSelection">
+                          @for (cand of unpackChildren(); track cand.id) {
+                            <option [value]="cand.id">
+                              {{ short(cand.id) }} · {{ cand.product?.name ?? '' }}
+                            </option>
+                          }
+                        </select>
+                        <button type="button" class="btn-primary" [disabled]="acting() || unpackSelection.length === 0" (click)="unpack()">
+                          {{ acting() ? 'Procesando…' : 'Desempaquetar' }}
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (canAssociate() || canDisassociate()) {
+                  <div class="space-y-4 mt-4 pt-4 border-t border-border">
+                    <h3 class="text-xs font-semibold text-mut uppercase tracking-wide">Asociaciones</h3>
+
+                    @if (canAssociate()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="assocSel">Asociar casos relacionados</label>
+                        <select id="assocSel" multiple size="4" class="field" [(ngModel)]="associateSelection">
+                          @for (cand of associateCandidates(); track cand.id) {
+                            <option [value]="cand.id">
+                              {{ short(cand.id) }} · {{ cand.product?.name ?? '' }}
+                            </option>
+                          }
+                        </select>
+                        <button type="button" class="btn-primary" [disabled]="acting() || associateSelection.length === 0" (click)="associate()">
+                          {{ acting() ? 'Procesando…' : 'Asociar' }}
+                        </button>
+                      </div>
+                    }
+
+                    @if (canDisassociate()) {
+                      <div class="space-y-2">
+                        <label class="block text-sm" for="dissocSel">Desasociar casos</label>
+                        <select id="dissocSel" multiple size="4" class="field" [(ngModel)]="disassociateSelection">
+                          @for (cand of associatedCases(); track cand.id) {
+                            <option [value]="cand.id">
+                              {{ short(cand.id) }} · {{ cand.product?.name ?? 'asociado' }}
+                            </option>
+                          }
+                        </select>
+                        <button type="button" class="btn-primary" [disabled]="acting() || disassociateSelection.length === 0" (click)="disassociate()">
+                          {{ acting() ? 'Procesando…' : 'Desasociar' }}
+                        </button>
+                      </div>
+                    }
                   </div>
                 }
 
                 @if (actionError()) {
-                  <div class="text-sm mt-3" style="color: var(--color-danger)">{{ actionError() }}</div>
+                  <div class="text-sm mt-4" style="color: var(--color-danger)">{{ actionError() }}</div>
                 }
                 @if (actionMessage()) {
-                  <div class="text-sm mt-3" style="color: var(--color-success)">{{ actionMessage() }}</div>
+                  <div class="text-sm mt-4" style="color: var(--color-success)">{{ actionMessage() }}</div>
                 }
               </section>
             } @else {
               <section class="card">
                 <h2 class="text-sm font-semibold mb-1">Sin acciones para ti</h2>
                 <p class="text-xs text-mut">
-                  No puedes enviar, recibir ni facturar este caso en este
-                  momento. Puede ser por su estado o porque tu actividad no
-                  incluye esa operación.
+                  No puedes actuar sobre este caso en este momento. Puede ser
+                  por su estado o porque tu actividad no incluye la operación.
                 </p>
               </section>
             }
@@ -404,6 +616,17 @@ const BIZ_TXN_TYPE_LABELS: Record<BizTransactionType, string> = {
     .case-row:hover {
       border-color: var(--color-accent);
     }
+    .case-row-static {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      align-items: flex-start;
+      padding: 0.6rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-2);
+    }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -471,6 +694,7 @@ export class Trace implements OnInit, AfterViewChecked {
   readonly notices = signal<Notice[]>([]);
   readonly myCases = signal<Epc[]>([]);
   readonly results = signal<Epc[]>([]);
+  readonly searchedItems = signal<SearchItem[]>([]);
 
   readonly myActorId = signal<string | null>(null);
   readonly myOperations = signal<ReadonlySet<string>>(new Set());
@@ -478,8 +702,18 @@ export class Trace implements OnInit, AfterViewChecked {
   readonly actionError = signal<string | null>(null);
   readonly actionMessage = signal<string | null>(null);
 
+  shipDestinations: ActorSummary[] = [];
+  shipDestination = '';
   invoiceNumber = '';
   invoiceRecipient = '';
+  poNumber = '';
+  desadvNumber = '';
+  bolNumber = '';
+  inspectionResult: 'passed' | 'failed' = 'passed';
+  packSelection: string[] = [];
+  unpackSelection: string[] = [];
+  associateSelection: string[] = [];
+  disassociateSelection: string[] = [];
 
   private readonly resolvedActors = new Set<string>();
 
@@ -489,6 +723,7 @@ export class Trace implements OnInit, AfterViewChecked {
       .then((me) => {
         this.myActorId.set(me.actor?.id ?? me.user.actorId);
         this.myOperations.set(new Set(me.actor?.operations ?? []));
+        this.loadDestinations();
       })
       .catch(() => {
         this.myActorId.set(null);
@@ -512,6 +747,7 @@ export class Trace implements OnInit, AfterViewChecked {
         epc.producerActorId,
         epc.ownerActorId,
         epc.custodianActorId,
+        epc.destinationActorId,
       ]) {
         if (id) ids.add(id);
       }
@@ -530,13 +766,14 @@ export class Trace implements OnInit, AfterViewChecked {
   lookup(): void {
     const q = this.query.trim();
     if (!q) {
-      this.error.set('Ingresa un EPC, SKU o lote.');
+      this.error.set('Ingresa un EPC, SKU, producto o lote.');
       return;
     }
     this.error.set(null);
     this.actionError.set(null);
     this.actionMessage.set(null);
     this.results.set([]);
+    this.searchedItems.set([]);
 
     if (q.startsWith('urn:')) {
       this.load(q);
@@ -545,24 +782,31 @@ export class Trace implements OnInit, AfterViewChecked {
 
     this.busy.set(true);
     this.api
-      .listEpcs({ q })
-      .then((matches) => {
+      .searchEpcs(q)
+      .then((res: EpcSearchResult) => {
         this.busy.set(false);
-        if (matches.length === 0) {
+        this.searchedItems.set(res.items);
+        if (res.cases.length === 0) {
           this.epc.set(null);
           this.history.set([]);
           this.notices.set([]);
-          this.error.set(
-            'No se encontraron casos con ese EPC, SKU o lote en tu organización.',
-          );
+          if (res.items.length === 0) {
+            this.error.set(
+              'No se encontraron casos ni productos con ese criterio.',
+            );
+          } else {
+            this.error.set(
+              'No hay casos rastreables para ese criterio, pero sí existen en tu catálogo.',
+            );
+          }
           return;
         }
-        if (matches.length === 1) {
-          this.query = matches[0].id;
-          this.load(matches[0].id);
+        if (res.cases.length === 1) {
+          this.query = res.cases[0].id;
+          this.load(res.cases[0].id);
           return;
         }
-        this.results.set(matches);
+        this.results.set(res.cases);
       })
       .catch((err: unknown) => {
         this.busy.set(false);
@@ -576,6 +820,7 @@ export class Trace implements OnInit, AfterViewChecked {
     this.actionError.set(null);
     this.actionMessage.set(null);
     this.results.set([]);
+    this.searchedItems.set([]);
     this.epc.set(null);
     this.history.set([]);
     this.notices.set([]);
@@ -597,6 +842,22 @@ export class Trace implements OnInit, AfterViewChecked {
       .finally(() => this.busy.set(false));
   }
 
+  anyAction(): boolean {
+    return (
+      this.canShip() ||
+      this.canReceive() ||
+      this.canInvoice() ||
+      this.canPo() ||
+      this.canDesadv() ||
+      this.canBol() ||
+      this.canInspect() ||
+      this.canPack() ||
+      this.canUnpack() ||
+      this.canAssociate() ||
+      this.canDisassociate()
+    );
+  }
+
   canShip(): boolean {
     const twin = this.epc();
     return (
@@ -609,10 +870,11 @@ export class Trace implements OnInit, AfterViewChecked {
 
   canReceive(): boolean {
     const twin = this.epc();
+    if (!twin || twin.status !== 'in_transit') return false;
     return (
-      !!twin &&
-      twin.status === 'in_transit' &&
-      (this.isOwner(twin) || this.isCustodian(twin)) &&
+      (this.isOwner(twin) ||
+        this.isCustodian(twin) ||
+        this.isDestination(twin)) &&
       this.hasOperation('object:receiving')
     );
   }
@@ -624,14 +886,152 @@ export class Trace implements OnInit, AfterViewChecked {
     );
   }
 
+  canPo(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin && !this.isOwner(twin) && this.hasOperation('transaction:po')
+    );
+  }
+
+  canDesadv(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin && this.isCustodian(twin) && this.hasOperation('transaction:desadv')
+    );
+  }
+
+  canBol(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin && this.isCustodian(twin) && this.hasOperation('transaction:bol')
+    );
+  }
+
+  canInspect(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin &&
+      this.isCustodian(twin) &&
+      this.hasOperation('object:inspecting')
+    );
+  }
+
+  canPack(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin &&
+      this.isCustodian(twin) &&
+      this.hasOperation('object:packing') &&
+      this.packCandidates().length > 0
+    );
+  }
+
+  canUnpack(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin &&
+      this.isCustodian(twin) &&
+      this.hasOperation('object:unpacking') &&
+      this.unpackChildren().length > 0
+    );
+  }
+
+  canAssociate(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin &&
+      this.isCustodian(twin) &&
+      this.hasOperation('association:ADD') &&
+      this.associateCandidates().length > 0
+    );
+  }
+
+  canDisassociate(): boolean {
+    const twin = this.epc();
+    return (
+      !!twin &&
+      this.isCustodian(twin) &&
+      this.hasOperation('association:DELETE') &&
+      this.associatedCases().length > 0
+    );
+  }
+
   hasOperation(code: string): boolean {
     return this.myOperations().has(code);
   }
 
+  packCandidates(): Epc[] {
+    const twin = this.epc();
+    if (!twin) return [];
+    return this.myCases().filter(
+      (c) =>
+        c.id !== twin.id &&
+        c.productId === twin.productId &&
+        c.parentId === null,
+    );
+  }
+
+  unpackChildren(): Epc[] {
+    const twin = this.epc();
+    if (!twin) return [];
+    return this.myCases().filter((c) => c.parentId === twin.id);
+  }
+
+  associateCandidates(): Epc[] {
+    const twin = this.epc();
+    if (!twin) return [];
+    const already = new Set(this.associatedCases().map((c) => c.id));
+    return this.myCases().filter((c) => c.id !== twin.id && !already.has(c.id));
+  }
+
+  associatedCases(): Epc[] {
+    const twin = this.epc();
+    if (!twin) return [];
+    const ids = this.associatedIds();
+    const byId = new Map(this.myCases().map((c) => [c.id, c]));
+    return [...ids].map((id) => byId.get(id)).filter((c): c is Epc => !!c);
+  }
+
+  private associatedIds(): Set<string> {
+    const twin = this.epc();
+    const ids = new Set<string>();
+    if (!twin) return ids;
+
+    for (const entry of this.history()) {
+      if (entry.type !== 'AssociationEvent') continue;
+
+      const payload = entry.payload as {
+        action?: string;
+        epcList?: string[];
+        associatedEPCs?: string[];
+      };
+      const action = payload.action;
+      const related = payload.associatedEPCs ?? [];
+
+      if (entry.role === 'observed') {
+        for (const id of related) {
+          if (action === 'ADD') ids.add(id);
+          else if (action === 'DELETE') ids.delete(id);
+        }
+      } else if (entry.role === 'associated') {
+        const target = payload.epcList?.[0];
+        if (target) {
+          if (action === 'ADD') ids.add(target);
+          else if (action === 'DELETE') ids.delete(target);
+        }
+      }
+    }
+
+    return ids;
+  }
+
   ship(): void {
     const twin = this.epc();
-    if (!twin) return;
-    void this.runAction(() => this.api.shipEpc(twin.id), 'Caso enviado.');
+    if (!twin || !this.shipDestination) return;
+    void this.runAction(
+      () => this.api.shipEpc(twin.id, { destinationActorId: this.shipDestination }),
+      'Caso enviado.',
+    );
   }
 
   receive(): void {
@@ -656,6 +1056,55 @@ export class Trace implements OnInit, AfterViewChecked {
           ownershipTransferTo: recipient || undefined,
         }),
       'Factura registrada.',
+    );
+  }
+
+  purchaseOrder(): void {
+    void this.runTransaction('po', this.poNumber, 'Orden de compra registrada.');
+  }
+
+  despatchAdvice(): void {
+    void this.runTransaction('desadv', this.desadvNumber, 'Aviso de despacho registrado.');
+  }
+
+  billOfLading(): void {
+    void this.runTransaction('bol', this.bolNumber, 'Guía de remisión registrada.');
+  }
+
+  inspect(): void {
+    const twin = this.epc();
+    if (!twin) return;
+    void this.runAction(
+      () => this.api.inspectEpc(twin.id, { result: this.inspectionResult }),
+      this.inspectionResult === 'failed'
+        ? 'Inspección registrada como no conforme.'
+        : 'Inspección registrada como conforme.',
+    );
+  }
+
+  pack(): void {
+    void this.runAggregate('pack', this.packSelection, 'Casos empaquetados.');
+  }
+
+  unpack(): void {
+    void this.runAggregate('unpack', this.unpackSelection, 'Casos desempaquetados.');
+  }
+
+  associate(): void {
+    const twin = this.epc();
+    if (!twin || this.associateSelection.length === 0) return;
+    void this.runAction(
+      () => this.api.associateEpc(twin.id, { relatedEpcs: this.associateSelection }),
+      'Asociación registrada.',
+    );
+  }
+
+  disassociate(): void {
+    const twin = this.epc();
+    if (!twin || this.disassociateSelection.length === 0) return;
+    void this.runAction(
+      () => this.api.disassociateEpc(twin.id, { relatedEpcs: this.disassociateSelection }),
+      'Asociación eliminada.',
     );
   }
 
@@ -725,12 +1174,65 @@ export class Trace implements OnInit, AfterViewChecked {
     return !!id && twin.custodianActorId === id;
   }
 
+  private isDestination(twin: Epc): boolean {
+    const id = this.myActorId();
+    return !!id && twin.destinationActorId === id;
+  }
+
   private async loadCases(): Promise<void> {
     try {
       this.myCases.set(await this.api.listEpcs());
     } catch {
       this.myCases.set([]);
     }
+  }
+
+  private loadDestinations(): void {
+    this.api
+      .listActors()
+      .then((actors) => {
+        this.shipDestinations = actors.filter(
+          (a) => a.id !== this.myActorId(),
+        );
+      })
+      .catch(() => {
+        this.shipDestinations = [];
+      });
+  }
+
+  private async runTransaction(
+    kind: 'po' | 'desadv' | 'bol',
+    number: string,
+    successMessage: string,
+  ): Promise<void> {
+    const twin = this.epc();
+    if (!twin) return;
+    const bizTransactionId = number.trim();
+    if (!bizTransactionId) {
+      this.actionError.set('Ingresa el número del documento.');
+      return;
+    }
+    const call =
+      kind === 'po'
+        ? this.api.purchaseOrderEpc(twin.id, { bizTransactionId })
+        : kind === 'desadv'
+          ? this.api.despatchAdviceEpc(twin.id, { bizTransactionId })
+          : this.api.billOfLadingEpc(twin.id, { bizTransactionId });
+    void this.runAction(() => call, successMessage);
+  }
+
+  private async runAggregate(
+    kind: 'pack' | 'unpack',
+    childEpcs: string[],
+    successMessage: string,
+  ): Promise<void> {
+    const twin = this.epc();
+    if (!twin || childEpcs.length === 0) return;
+    const call =
+      kind === 'pack'
+        ? this.api.packEpc(twin.id, { childEpcs })
+        : this.api.unpackEpc(twin.id, { childEpcs });
+    void this.runAction(() => call, successMessage);
   }
 
   private async runAction(
@@ -749,6 +1251,14 @@ export class Trace implements OnInit, AfterViewChecked {
       this.actionMessage.set(successMessage);
       this.invoiceNumber = '';
       this.invoiceRecipient = '';
+      this.poNumber = '';
+      this.desadvNumber = '';
+      this.bolNumber = '';
+      this.shipDestination = '';
+      this.packSelection = [];
+      this.unpackSelection = [];
+      this.associateSelection = [];
+      this.disassociateSelection = [];
       this.load(twin.id);
       await this.loadCases();
     } catch (err: unknown) {

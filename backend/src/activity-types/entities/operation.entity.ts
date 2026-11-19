@@ -7,7 +7,7 @@ export class Operation {
   code: string;
 
   /** Nombre legible para mostrar en la UI (ej. 'Dispatch products'). */
-  @Column()
+  @Column({ type: 'varchar' })
   label: string;
 
   /** Grupo para organizar los checkboxes en la UI (ej. 'Movement'). */
