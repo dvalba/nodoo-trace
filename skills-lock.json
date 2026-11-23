@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "skills": {
+    "angular-developer": {
+      "source": "angular/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": ""
+    },
+    "nestjs-best-practices": {
+      "source": "kadajett/agent-nestjs-skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": ""
+    },
+    "oxlint": {
+      "source": "delexw/claude-code-misc",
+      "sourceType": "autoskills-registry",
+      "computedHash": ""
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "commit": "0b75b5835a87de1fdd202ba965f3bc5a27738fdf",
+      "sourceType": "github",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "computedHash": "111e9d3e9d63dea34814120fb6583c0b28ee45371662801d8e8d8bdf4b05dcb0"
+    },
+    "tailwind-css-patterns": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "autoskills-registry",
+      "computedHash": ""
+    },
+    "vitest": {
+      "source": "antfu/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": ""
+    }
+  }
+}

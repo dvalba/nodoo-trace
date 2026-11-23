@@ -193,6 +193,7 @@ describe('Traceability API (e2e)', () => {
     const shipped = await request(server)
       .post(`${prefix}/epcs/${shippedEpc}/ship`)
       .set(authorized(tokenA))
+      .send({ destinationActorId: actorB })
       .expect(201);
     expect(shipped.body.status).toBe('in_transit');
 

@@ -6,8 +6,9 @@ import { Invitation } from './entities/invitation.entity.js';
 import { InvitationsRepository } from './interfaces/invitations-repository.interface.js';
 import { TypeOrmInvitationsRepository } from './repository/type-orm-invitations.repository.js';
 import { ActorModule } from '../actor/actor.module.js';
+import { ConfigService } from '@nestjs/config';
 import { EmailSender } from '../common/interfaces/email-sender.js';
-import { FileEmailSender } from '../common/providers/file-email-sender.js';
+import { createEmailSender } from '../common/providers/email-sender.factory.js';
 import { TokenService } from '../common/interfaces/token-service.interface.js';
 import { HmacTokenService } from '../common/providers/hmac-token.js';
 import { UsersModule } from '../users/users.module.js';
@@ -25,7 +26,8 @@ import { UsersModule } from '../users/users.module.js';
     },
     {
       provide: EmailSender,
-      useClass: FileEmailSender
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createEmailSender(config)
     },
     {
       provide: TokenService,

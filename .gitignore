@@ -32,3 +32,6 @@ yarn-error.log*
 Thumbs.db
 .idea/
 *.launch
+
+# Kanban board (symlink to Obsidian vault, machine-local)
+/board.md
