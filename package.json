@@ -15,7 +15,8 @@
     "seed": "pnpm --filter backend seed",
     "build": "pnpm -r build",
     "lint": "pnpm --filter backend lint",
-    "test": "pnpm --filter backend test"
+    "test": "pnpm --filter backend test",
+    "test:e2e:web": "pnpm --filter e2e test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

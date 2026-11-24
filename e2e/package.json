@@ -1,0 +1,16 @@
+{
+  "name": "e2e",
+  "version": "0.0.1",
+  "description": "Web E2E suite (Playwright) — spec 001 US16–US19",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test && node scripts/copy-evidence.ts",
+    "reset-db": "node scripts/reset-e2e-db.ts",
+    "evidence": "node scripts/copy-evidence.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^24.19.2"
+  }
+}

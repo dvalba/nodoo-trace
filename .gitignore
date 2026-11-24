@@ -15,6 +15,11 @@ out-tsc/
 coverage/
 .nyc_output/
 
+# Web E2E (Playwright, spec 001)
+e2e/test-results/
+e2e/playwright-report/
+e2e-evidence/
+
 # Logs
 *.log
 npm-debug.log*
