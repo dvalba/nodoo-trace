@@ -41,7 +41,7 @@ interface CreatedCase {
               [(ngModel)]="name"
               (ngModelChange)="onNameInput()"
               class="field"
-              placeholder="Vacuna antigripal 0.5 mL"
+              placeholder="Nombre del producto"
             />
           </div>
           <div>
@@ -52,7 +52,7 @@ interface CreatedCase {
               [(ngModel)]="sku"
               (ngModelChange)="skuTouched = true"
               class="field font-mono text-xs"
-              placeholder="VAC-ANTIGRIPAL-05ML"
+              placeholder="PROD-0001"
             />
             <p class="text-[11px] text-mut mt-1">
               Se genera desde el nombre; puedes editarlo.

@@ -39,7 +39,7 @@ import { Auth } from '../../core/auth.service';
                 name="legalName"
                 [(ngModel)]="legalName"
                 class="field"
-                placeholder="Laboratorios FarmaSur"
+                placeholder="Nombre de la organización"
               />
             </div>
             <div>

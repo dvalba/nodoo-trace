@@ -14,12 +14,25 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
-  webServer: {
-    command:
-      'concurrently "DB_NAME=supply_chain_e2e pnpm --filter backend start:dev" "pnpm --filter nodoo-trace-web start"',
-    cwd: '..',
-    url: 'http://localhost:4200',
-    timeout: 120_000,
-    reuseExistingServer: false,
-  },
+  // Dos servidores: la readiness debe cubrir AMBOS. Con una sola entrada
+  // (concurrently) Playwright solo esperaba a :4200, y el login del smoke
+  // podía llegar antes de que el backend (:3001, nest --watch en frío)
+  // escuchara: el proxy dev devolvía 500 y la UI mostraba un falso
+  // "Credenciales inválidas". El probe es un endpoint público (sin auth).
+  webServer: [
+    {
+      command: 'DB_NAME=supply_chain_e2e pnpm --filter backend start:dev',
+      cwd: '..',
+      url: 'http://localhost:3001/api/v1/activity-types',
+      timeout: 180_000,
+      reuseExistingServer: false,
+    },
+    {
+      command: 'pnpm --filter nodoo-trace-web start',
+      cwd: '..',
+      url: 'http://localhost:4200',
+      timeout: 180_000,
+      reuseExistingServer: false,
+    },
+  ],
 });

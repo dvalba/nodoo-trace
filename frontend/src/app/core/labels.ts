@@ -52,7 +52,7 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   warehouse: 'Almacén o centro de distribución',
   wholesaler: 'Mayorista / distribuidor',
   local_carrier: 'Transportista local',
-  retailer: 'Minorista / farmacia u hospital',
+  retailer: 'Minorista / punto de venta',
   auditor_consumer: 'Auditor o consumidor final',
 };
 
@@ -63,7 +63,7 @@ export const ACTIVITY_HINTS: Record<string, string> = {
   warehouse: 'Almacena mercancía antes de distribuirla.',
   wholesaler: 'Compra al por mayor y distribuye a minoristas.',
   local_carrier: 'Transporta carga dentro de una ciudad o región.',
-  retailer: 'Vende al consumidor final, farmacia u hospital.',
+  retailer: 'Vende al consumidor final.',
   auditor_consumer: 'Audita la cadena o consume el producto final.',
 };
 

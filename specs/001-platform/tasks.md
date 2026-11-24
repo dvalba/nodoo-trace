@@ -58,11 +58,11 @@
 
 **Tarjeta de tablero**: S2-3.
 
-- [ ] S2-3 [US19] Generar las capturas de las pantallas actuales en 1440x900 y 390x844 con Playwright (spec `e2e/tests/visual-captures.spec.ts` o script de `e2e/scripts/`), guardadas «antes» en `e2e-evidence/sprint-02/visual/antes/` (login, dashboard, productos, trace, equipo, organización)
+- [x] S2-3 [US19] Generar las capturas de las pantallas actuales en 1440x900 y 390x844 con Playwright (spec `e2e/tests/visual-captures.spec.ts` o script de `e2e/scripts/`), guardadas «antes» en `e2e-evidence/sprint-02/visual/antes/` (login, dashboard, productos, trace, equipo, organización)
 
-- [ ] S2-3 [US19] Examinar las capturas con la herramienta Read (jerarquía, espaciado, alineación, contraste, estados vacíos/carga/error, truncados, consistencia, neutralidad de sector) y aplicar las correcciones de UI pequeñas y justificadas en `frontend/src/app/pages/` (sin funcionalidades ni componentes que la spec no pida; NFR-12)
+- [x] S2-3 [US19] Examinar las capturas con la herramienta Read (jerarquía, espaciado, alineación, contraste, estados vacíos/carga/error, truncados, consistencia, neutralidad de sector) y aplicar las correcciones de UI pequeñas y justificadas en `frontend/src/app/pages/` (sin funcionalidades ni componentes que la spec no pida; NFR-12)
 
-- [ ] S2-3 [US19] Regenerar las capturas «después» en `e2e-evidence/sprint-02/visual/despues/` y escribir `e2e-evidence/sprint-02/visual/NOTAS.md` con la descripción de 2-3 líneas por pantalla (qué se revisó y qué mejoró)
+- [x] S2-3 [US19] Regenerar las capturas «después» en `e2e-evidence/sprint-02/visual/despues/` y escribir `e2e-evidence/sprint-02/visual/NOTAS.md` con la descripción de 2-3 líneas por pantalla (qué se revisó y qué mejoró)
 
 **Checkpoint**: revisión visual completa y documentada; UI neutra verificada.
 

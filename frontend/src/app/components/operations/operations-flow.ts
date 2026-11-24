@@ -153,7 +153,7 @@ interface OperationGroup {
             [(ngModel)]="customName"
             class="field"
             maxlength="80"
-            placeholder="Ej.: Distribuidor farmacéutico"
+            placeholder="Ej.: Mayorista regional"
           />
 
           <div class="custom-ops">
