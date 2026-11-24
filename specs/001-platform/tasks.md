@@ -76,11 +76,11 @@
 
 **Tarjeta de tablero**: S2-4.
 
-- [ ] S2-4 [P] Auditar la capa ledger/visibilidad (`backend/src/event-ledger/`, `backend/src/operations/`, controlador `epcs`) contra FR-D2..FR-D6 y FR-5xx..FR-8xx (incl. notas 1–4: sobre-exposición en `canRead`/`listEpc`/`search`/`getHistory`, receiving sin escaneo físico, 409 de receiving único, endpoint de rechazo de actor)
+- [x] S2-4 [P] Auditar la capa ledger/visibilidad (`backend/src/event-ledger/`, `backend/src/operations/`, controlador `epcs`) contra FR-D2..FR-D6 y FR-5xx..FR-8xx (incl. notas 1–4: sobre-exposición en `canRead`/`listEpc`/`search`/`getHistory`, receiving sin escaneo físico, 409 de receiving único, endpoint de rechazo de actor)
 
-- [ ] S2-4 [P] Auditar el resto de E1–E25 (auth, invitations, users, actor/onboarding, admin, products/batches, notices/acks, email provider, seed) contra sus FR (incl. notas 5–6: `MAIL_OUTBOX_PATH` leído desde `process.env`, seed que comisiona solo cases)
+- [x] S2-4 [P] Auditar el resto de E1–E25 (auth, invitations, users, actor/onboarding, admin, products/batches, notices/acks, email provider, seed) contra sus FR (incl. notas 5–6: `MAIL_OUTBOX_PATH` leído desde `process.env`, seed que comisiona solo cases)
 
-- [ ] S2-4 Registrar los desvíos en `board.md` (nuevas tarjetas con FR y etiqueta `#gap`) y en `sprints/sprint-03.md` / `sprints/sprint-04.md` (scope de cierre, sin re-implementar ahora)
+- [x] S2-4 Registrar los desvíos en `board.md` (nuevas tarjetas con FR y etiqueta `#gap`) y en `sprints/sprint-03.md` / `sprints/sprint-04.md` (scope de cierre, sin re-implementar ahora)
 
 **Checkpoint**: lista de gaps completa, trazable (FR → tarjeta → sprint de cierre).
 
