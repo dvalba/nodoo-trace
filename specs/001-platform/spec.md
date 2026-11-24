@@ -37,11 +37,15 @@ nodoo-trace es una plataforma SaaS multi-tenant de trazabilidad **genérica, agn
 - Q: ¿Cómo se aíslan los datos de la suite E2E? → A: Base de datos e2e dedicada en la misma instancia local de Postgres (nombre de BD distinto): drop/create + `pnpm seed` por ejecución, con la API arrancada con override del nombre de BD por env; nunca toca la base de desarrollo.
 - Q: ¿La evidencia E2E se commitea? → A: No: `e2e-evidence/` y los resultados de Playwright (test-results, report) quedan fuera de git (`.gitignore`); los videos son pesados.
 
+### Session 2026-11-24
+
+- Q: ¿Cómo se lee la etiqueta física QR en el receiving (FR-602): cámara del navegador o entrada manual del EPC? → A: **Entrada manual del EPC como flujo primario** (el destinatario ingresa el EPC impreso en la etiqueta física; el sistema valida que corresponda a un case `in_transit` a su favor, 400 si no) **y cámara del navegador como opción** (getUserMedia + decodificador QR que completa el campo). La cámara no sustituye al flujo manual: el manual es el flujo testeado en la e2e por historia (US17); el caso de cámara, que no puede ejecutarse en e2e headless, se declara explícitamente en el reporte (spec l.349).
+
 ## Usuarios / actores
 
 - **Manufacturer / producer** (supplier, manufacturer): comisiona EPCs, transforma, inspecciona.
 - **Distributor / wholesaler**: custodia, agrupa, emite documentos (PO, despatch advice, BOL).
-- **Destination** (retailer u otra organización de destino): recibe cases en tránsito escaneando la etiqueta física.
+- **Destination** (retailer u otra organización de destino): recibe cases en tránsito leyendo la etiqueta física EPC (entrada manual; cámara opcional).
 - **Transporter** (local/intl carrier): custodia en tránsito, BOL.
 - **Warehouse**: custodia, inspección, agrupación.
 - **Staff de la plataforma**: aprueba organizaciones, ve pendientes.
@@ -153,12 +157,12 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 
 **Why this priority**: es el corazón de la trazabilidad: el case viaja, cambia de manos, y cada actor ve exactamente lo que debe ver.
 
-**Independent Test**: el producer comisiona y embarca a un distribuidor; el distribuidor recibe escaneando el EPC y factura a la organización de destino; cada actor consulta el historial y ve solo su scope.
+**Independent Test**: el producer comisiona y embarca a un distribuidor; el distribuidor recibe leyendo la etiqueta física EPC (entrada manual) y factura a la organización de destino; cada actor consulta el historial y ve solo su scope.
 
 **Acceptance Scenarios**:
 
 - **Given** el custodian de un case `active` con la operation `object:shipping`, **When** lo embarca con un destinatario, **Then** el sistema registra un ShippingEvent y el gemelo pasa a `in_transit` con el destinatario.
-- **Given** el destinatario de un case `in_transit` con la operation `object:receiving`, **When** escanea la etiqueta física EPC del case, **Then** el sistema registra un ReceivingEvent: `custodian` = destinatario, sin `destination`, estado `active`.
+- **Given** el destinatario de un case `in_transit` con la operation `object:receiving`, **When** lee la etiqueta física EPC del case (entrada manual del EPC; la cámara del navegador es opcional), **Then** el sistema registra un ReceivingEvent: `custodian` = destinatario, sin `destination`, estado `active`.
 - **Given** el owner de un case con la operation `transaction:inv`, **When** emite una factura con `ownershipTransferTo`, **Then** el sistema registra un TransactionEvent y el owner del gemelo pasa a la organización destinataria; sin `ownershipTransferTo` el owner pasa a la emisora.
 - **Given** un actor, **When** lista EPCs, **Then** el sistema devuelve solo los de su scope: el owner los suyos; el custodian los de su custodia; el destinatario los `in_transit` a su favor; el producer que ya no es owner no ve nada.
 - **Given** un custodian, **When** ve el gemelo de un EPC, **Then** no ve el producer ni la cadena upstream; **Given** el destinatario, **Then** ve solo el EPC y el producto del shipment a su favor.
@@ -399,7 +403,7 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 - **FR-D2**: EL SISTEMA responde `404` (nunca `403`) a una organización sin relación con un EPC (ni owner, ni custodian, ni producer, ni destinatario) para cualquier operación, historial, gemelo, producto o aviso sobre ese EPC.
 - **FR-D3**: CUANDO el owner actual consulta el historial de un EPC, EL SISTEMA devuelve todo el historial (toda la cadena).
 - **FR-D4**: CUANDO un custodian consulta el historial de un EPC, EL SISTEMA devuelve todos los eventos de su ventana de custodia (incluida la identidad del owner) y NUNCA la cadena upstream (custodios anteriores, producers, transportistas).
-- **FR-D5**: CUANDO el destinatario de un case en tránsito consulta, EL SISTEMA le muestra ese case solo como shipment a su favor (EPC + producto); el receiving se ejecuta escaneando la etiqueta física EPC, no desde una lista.
+- **FR-D5**: CUANDO el destinatario de un case en tránsito consulta, EL SISTEMA le muestra ese case solo como shipment a su favor (EPC + producto); el receiving se ejecuta leyendo la etiqueta física EPC (entrada manual del EPC, con cámara opcional), no desde una lista.
 - **FR-D6**: CUANDO un producer que ya no es owner consulta un EPC, EL SISTEMA no le muestra nada sobre ese EPC.
 - **FR-D7**: EL SISTEMA trata un case reutilizable y cada unidad de contenido como gemelos separados (cada uno con su EPC e historial) ligados por agregación, completamente separables: el contenido puede moverse entre cases (unpack/transform) y un case puede dejarse atrás o devolverse vacío.
 - **FR-D8**: EL SISTEMA NO serializa el envase desechable o indistinto (bolsa de plástico, pallet genérico): sin EPC, sin gemelo, sin historial; solo tiene significado físico/logístico.
@@ -454,7 +458,7 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 #### US6 — Custodia y visibilidad
 
 - **FR-601**: CUANDO el custodian con `object:shipping` embarca un case `active` con destinatario, EL SISTEMA registra un ShippingEvent y el gemelo pasa a `in_transit` con el destinatario.
-- **FR-602**: CUANDO el destinatario de un case `in_transit` con `object:receiving` escanea la etiqueta física EPC, EL SISTEMA registra un ReceivingEvent: `custodian` = destinatario, sin `destination`, `active`.
+- **FR-602**: CUANDO el destinatario de un case `in_transit` con `object:receiving` lee la etiqueta física EPC (entrada manual del EPC; cámara del navegador opcional), EL SISTEMA registra un ReceivingEvent: `custodian` = destinatario, sin `destination`, `active`; SI el EPC no es `in_transit` a su favor, EL SISTEMA responde 400.
 - **FR-603**: CUANDO el owner con `transaction:inv` emite una factura, EL SISTEMA registra un TransactionEvent y el owner del gemelo pasa a `ownershipTransferTo` si está presente, o a la emisora si no.
 - **FR-604**: CUANDO un actor lista EPCs, EL SISTEMA devuelve solo los de su scope (owner: los suyos; custodian: los de su custodia; destinatario: `in_transit` a su favor; producer no-owner: ninguno).
 - **FR-605**: CUANDO se consulta el gemelo, EL SISTEMA lo filtra por scope: el custodian no ve el producer ni la cadena upstream; el destinatario solo ve EPC + producto del shipment a su favor.
@@ -589,7 +593,7 @@ Para la revisión de código vs. spec (sprint de revisión). No son requisitos:
 - La plataforma es el system of record: eventos locales + importados.
 - Las organizaciones del seed son datos de demostración de un ejemplo de cadena: un producer, un distribuidor y una organización de destino (la plataforma es agnóstica de sector).
 - La URN del EPC la genera la plataforma con formato fijo.
-- El escaneo de la etiqueta física (QR) se resuelve en el navegador (cámara o entrada manual — ver Dudas abiertas).
+- La lectura de la etiqueta física (QR) se resuelve en el navegador: entrada manual del EPC como flujo primario, con cámara (getUserMedia + decodificador QR) como opción (resuelto en Clarifications, 2026-11-24).
 
 ## Out of scope
 
@@ -628,4 +632,3 @@ La estructura final se confirma en el paso de plan.
 ## Open Questions
 
 - ¿Canal de importación EPCIS 2.0 de terceros: archivo manual, endpoint REST o suscripción EPCIS poll/notify? (FR-2001)
-- ¿Cómo se lee la etiqueta física QR en el receiving: cámara del navegador o entrada manual del EPC? (FR-602)

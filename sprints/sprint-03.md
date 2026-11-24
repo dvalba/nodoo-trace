@@ -23,14 +23,17 @@ Tareas: S3-1, S3-2, S3-3 (orden en `board.md`; una a la vez)
 | Gap | FR | Desvío (código as-built) |
 |-----|----|---------------------------|
 | G1 | FR-D4/FR-D5/FR-D6, FR-604/605/606 (nota 1) | `canRead` incluye producer y destination; `getHistory` devuelve el historial completo al custodian actual; `listEpc`/`search` con la cláusula de 4 roles (`event-ledger.service.ts`) |
-| G2 | FR-D5, FR-602 (nota 2) | Receiving por botón desde la lista (`trace.ts`/`api.service.ts`), no por escaneo de la etiqueta física EPC |
+| G2 | FR-D5, FR-602 (nota 2) | Receiving por botón desde la lista (`trace.ts`/`api.service.ts`), no por lectura de la etiqueta física EPC (duda l.631 resuelta: entrada manual + cámara opcional) |
 | G3 | FR-602 + estado límite «recibir sin destinatario o ya recibido → 400» (spec l.169/384) | `findReceivableEpc` sin guardas de estado `in_transit` ni de destinatario: re-receiving posible |
 | G4 | FR-601 + estado límite «embarcar un case in_transit → 400» (spec l.170) | `ship` sin guard de estado: un case `in_transit` puede re-embarcarse |
 | G5 | FR-803 + estado límite «descendencia → 400» (spec l.201/385) | `aggregate` solo bloquea el ciclo directo, no la descendencia profunda (el proyector sí mantiene `parentId`) |
 | G10 | FR-701 | `registerBusinessTransaction` no aplica el rol emisor (po: no-owner; desadv/bol: custodian) |
 
-Antes de S3-1: cerrar la duda abierta de la spec (¿cámara o entrada manual del
-EPC en el receiving, spec l.631) — condiciona el diseño de G2.
+Antes de S3-1: ~~cerrar la duda abierta de la spec (¿cámara o entrada manual del
+EPC en el receiving, spec l.631)~~ **Resuelta (2026-11-24, Clarifications de la
+spec)**: entrada manual del EPC como flujo primario + cámara del navegador
+opcional (getUserMedia + decodificador QR que completa el campo); el flujo
+manual es el testeado en la e2e por historia (US17).
 
 ## Observaciones de spec (fix de documentación; no son gaps de código)
 
