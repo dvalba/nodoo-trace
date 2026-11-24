@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test && node scripts/copy-evidence.ts",
+    "test:visual": "playwright test --config playwright.visual.config.ts && node scripts/copy-evidence.ts",
     "reset-db": "node scripts/reset-e2e-db.ts",
     "evidence": "node scripts/copy-evidence.ts"
   },

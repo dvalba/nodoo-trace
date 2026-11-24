@@ -16,7 +16,8 @@
     "build": "pnpm -r build",
     "lint": "pnpm --filter backend lint",
     "test": "pnpm --filter backend test",
-    "test:e2e:web": "pnpm --filter e2e test"
+    "test:e2e:web": "pnpm --filter e2e test",
+    "test:visual": "pnpm --filter e2e test:visual"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

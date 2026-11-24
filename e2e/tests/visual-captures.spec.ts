@@ -3,8 +3,12 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 // Capturas «antes»/«después» de la revisión visual (S2-3, US19, FR-1509/FR-1510).
-// Queda fuera de la corrida por defecto de `pnpm test:e2e:web`: solo se ejecuta
-// con VISUAL_CAPTURES=antes|despues, que también fija el subdirectorio de salida.
+// Utility de capturas: NO forma parte de la suite por defecto (excluida por
+// testIgnore en playwright.config.ts, FR-1502) y corre con
+// `VISUAL_CAPTURES=antes|despues pnpm test:visual` (config dedicada
+// playwright.visual.config.ts, FR-1504), que también fija el subdirectorio de
+// salida. Cumple FR-1507: sin test.skip ni esperas fijas; las esperas son
+// sobre condiciones explícitas (heading/botón visibles, networkidle).
 const rawMode = process.env.VISUAL_CAPTURES;
 const mode: 'antes' | 'despues' | null =
   rawMode === 'antes' || rawMode === 'despues' ? rawMode : null;
@@ -41,9 +45,23 @@ async function login(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Inicio', level: 1 })).toBeVisible();
 }
 
+// Condición explícita de que la pantalla está renderizada (FR-1507): se usa
+// antes de capturar y de nuevo tras cada cambio de viewport.
+async function expectRendered(page: Page, screen: Screen): Promise<void> {
+  if (screen.heading) {
+    await expect(page.getByRole('heading', { name: screen.heading, level: 1 })).toBeVisible();
+  } else {
+    await expect(page.getByRole('button', { name: 'Iniciar sesión' })).toBeVisible();
+  }
+}
+
 for (const screen of screens) {
   test(`captura ${screen.key}`, async ({ page }) => {
-    test.skip(mode === null, 'VISUAL_CAPTURES no seteado (antes|despues)');
+    if (mode === null) {
+      throw new Error(
+        'VISUAL_CAPTURES no seteado: corre con `VISUAL_CAPTURES=antes|despues pnpm test:visual`',
+      );
+    }
     const outDir = path.resolve(process.cwd(), '../e2e-evidence/sprint-02/visual', mode);
     mkdirSync(outDir, { recursive: true });
 
@@ -54,18 +72,12 @@ for (const screen of screens) {
       await page.goto(screen.path);
     }
 
-    if (screen.heading) {
-      await expect(page.getByRole('heading', { name: screen.heading, level: 1 })).toBeVisible();
-    } else {
-      await expect(page.getByRole('button', { name: 'Iniciar sesión' })).toBeVisible();
-    }
-
+    await expectRendered(page, screen);
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
 
     for (const viewport of viewports) {
       await page.setViewportSize(viewport.size);
-      await page.waitForTimeout(400);
+      await expectRendered(page, screen);
       await page.screenshot({
         path: path.join(outDir, `${screen.key}-${viewport.name}.png`),
         fullPage: true,

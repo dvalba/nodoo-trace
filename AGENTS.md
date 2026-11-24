@@ -13,6 +13,7 @@ pnpm db:up | db:down | db:reset   # docker compose; db:reset wipes the volume
 pnpm lint         # oxlint, backend only (no frontend lint)
 pnpm test         # backend unit tests only (vitest, pure mocks, no DB)
 pnpm test:e2e:web # web E2E suite (Playwright in e2e/ package, spec 001 US16–US19); self-bootstraps DB supply_chain_e2e (drop/create/seed) and its own backend+web; keep the dev stack stopped (ports 3001/4200 free); evidence copied to e2e-evidence/sprint-NN/ (git-ignored)
+pnpm test:visual  # capture utility (US19, FR-1509): `VISUAL_CAPTURES=antes|despues`; runs OUTSIDE the default suite (`testIgnore`) with its own config (`playwright.visual.config.ts`) — FR-1507: the default suite must contain no `test.skip`/fixed waits
 pnpm build        # nest build + ng build (this is also the typecheck; there is no tsc script)
 ```
 

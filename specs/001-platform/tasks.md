@@ -86,7 +86,23 @@
 
 ---
 
-## Phase 5: Cierre de Sprint 02 (US18)
+## Phase 5: Cumplimiento FR-1507 de la suite web (S2-6)
+
+**Goal**: todos los specs que ejecuta `pnpm test:e2e:web` cumplen FR-1507 (sin `test.skip` ni esperas fijas); la utility de capturas (US19) queda fuera de la corrida por defecto y corre con su propio config y script raíz.
+
+**Tarjeta de tablero**: S2-6.
+
+- [x] S2-6 Enmiendar la spec (FR-1502/FR-1504/FR-1509): la utility de capturas se excluye de la suite por defecto (`testIgnore`) y corre con su propio config (`playwright.visual.config.ts`) y script raíz `pnpm test:visual`
+
+- [x] S2-6 Implementar la exclusión y el config/script dedicados (`e2e/playwright.config.ts`, `e2e/playwright.visual.config.ts`, `package.json` raíz y `e2e/package.json`)
+
+- [x] S2-6 Reescribir `e2e/tests/visual-captures.spec.ts` sin `test.skip` ni `waitForTimeout` fijos (esperas sobre condiciones explícitas; fallo explícito si `VISUAL_CAPTURES` no está seteado)
+
+**Independent Test**: `pnpm test:e2e:web` corre solo el smoke (0 skip) y `VISUAL_CAPTURES=despues pnpm test:visual` corre las 6 capturas y regenera la evidencia.
+
+---
+
+## Phase 6: Cierre de Sprint 02 (US18)
 
 - [ ] S2-5 [US18] Cerrar Sprint 02: verificar los Quality Gates de la constitución (lint/test/build/e2e API + `pnpm test:e2e:web`), escribir la tabla final `e2e-evidence/sprint-02/summary.md` (fila por historia: historia → test → resultado → enlace al video) y completar el cierre en `sprints/sprint-02.md` + tarjetas en `board.md`
 
@@ -116,7 +132,8 @@
 - **S2-2 (US16)**: depende de S2-1. **Bloquea** S2-3 (necesita la infra de capturas) y S2-5.
 - **S2-3 (US19)**: depende de S2-2.
 - **S2-4 (auditoría)**: independiente de S2-2/S2-3 (solo lee código) → paralelizable con S2-3.
-- **S2-5 (cierre)**: depende de S2-2 + S2-3 + S2-4.
+- **S2-5 (cierre)**: depende de S2-2 + S2-3 + S2-4 + S2-6.
+- **S2-6 (FR-1507)**: depende de S2-2 + S2-3 (corrige la suite que entregaron). **Bloquea** S2-5.
 - **Sprint 03**: depende de S2-4 (los gaps definen el scope) y de S2-2 (infra).
 - **Sprint 04**: depende de la clarificación R6 (dueño) + infra E2E.
 

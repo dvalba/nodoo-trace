@@ -2,6 +2,11 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  // Utility de capturas (US19, FR-1509; S2-6): fuera de la suite por defecto —
+  // la suite de `pnpm test:e2e:web` debe cumplir FR-1507 (sin test.skip ni
+  // esperas fijas) en todos sus specs. Corre con su config dedicada:
+  // `VISUAL_CAPTURES=antes|despues pnpm test:visual`.
+  testIgnore: /visual-captures/,
   outputDir: './test-results',
   globalSetup: './scripts/reset-e2e-db.ts',
   timeout: 60_000,
