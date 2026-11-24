@@ -104,7 +104,7 @@
 
 ## Phase 6: Cierre de Sprint 02 (US18)
 
-- [ ] S2-5 [US18] Cerrar Sprint 02: verificar los Quality Gates de la constitución (lint/test/build/e2e API + `pnpm test:e2e:web`), escribir la tabla final `e2e-evidence/sprint-02/summary.md` (fila por historia: historia → test → resultado → enlace al video) y completar el cierre en `sprints/sprint-02.md` + tarjetas en `board.md`
+- [x] S2-5 [US18] Cerrar Sprint 02: verificar los Quality Gates de la constitución (lint/test/build/e2e API + `pnpm test:e2e:web`), escribir la tabla final `e2e-evidence/sprint-02/summary.md` (fila por historia: historia → test → resultado → enlace al video) y completar el cierre en `sprints/sprint-02.md` + tarjetas en `board.md`
 
 ---
 
