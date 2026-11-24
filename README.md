@@ -27,7 +27,7 @@ La API usa el puerto `3001` y PostgreSQL el `5434` por defecto, para evitar choq
 
 ## Demo
 
-La semilla crea una cadena farmacéutica con tres organizaciones aprobadas, casos rastreables y un retiro con acuses (los pallets no se serializan). Todas las cuentas usan la contraseña `Seed1234`:
+La semilla crea una cadena de ejemplo con tres organizaciones aprobadas, casos rastreables y un retiro con acuses (los pallets no se serializan). Son datos de demostración de un ejemplo de cadena: la plataforma es agnóstica de sector. Todas las cuentas usan la contraseña `Seed1234`:
 
 | Organización | Rol | Email |
 | --- | --- | --- |
@@ -40,7 +40,14 @@ Estas cuentas ya tienen su actividad configurada. Si registras una organización
 Detalle de la historia, EPCs de ejemplo y prueba con `curl` en [backend/README.md](backend/README.md#semilla-de-desarrollo). Si ya tenías una base con una demo anterior, ejecuta `pnpm db:reset`, vuelve a arrancar y, si quieres la demo, `pnpm seed`.
 
 Otros scripts de la raíz: `pnpm dev:backend`, `pnpm dev:frontend`, `pnpm db:up`,
-`pnpm db:down`, `pnpm db:reset`, `pnpm build`, `pnpm lint`, `pnpm test`.
+`pnpm db:down`, `pnpm db:reset`, `pnpm build`, `pnpm lint`, `pnpm test`,
+`pnpm test:e2e:web`.
+
+La suite E2E web (`pnpm test:e2e:web`) corre Playwright contra una base de datos
+dedicada `supply_chain_e2e` que se crea y siembra sola antes de cada ejecución y
+levanta su propio backend + frontend; requiere que el stack de dev esté detenido
+(puertos 3001 y 4200 libres). La evidencia (video, capturas) se copia a
+`e2e-evidence/sprint-NN/` (fuera de git).
 
 > Si tu mirror de npm no responde, instala con
 > `pnpm install --registry=https://registry.npmjs.org/`.

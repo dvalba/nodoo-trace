@@ -39,7 +39,7 @@ Al arrancar se siembran los tipos de actividad, las operaciones y el usuario sta
 
 ## Semilla de datos
 
-Ejecuta `pnpm seed` (raíz del repo) para crear de forma idempotente una cadena **farmacéutica** con tres organizaciones ya aprobadas, sus productos/lotes, **casos rastreables** (cada caso es un EPC) y el historial del libro de eventos con fechas retroactivas, además de un retiro con acuses. Sirve para no tener la base vacía mientras pruebas. El comando compila el backend y ejecuta `dist/scripts/seed.js`, y no hace nada si la cadena ya existe.
+Ejecuta `pnpm seed` (raíz del repo) para crear de forma idempotente una cadena de ejemplo con tres organizaciones ya aprobadas, sus productos/lotes, **casos rastreables** (cada caso es un EPC) y el historial del libro de eventos con fechas retroactivas, además de un retiro con acuses. Son datos de demostración de un ejemplo de cadena: la plataforma es agnóstica de sector. Sirve para no tener la base vacía mientras pruebas. El comando compila el backend y ejecuta `dist/scripts/seed.js`, y no hace nada si la cadena ya existe.
 
 > En esta semilla los **pallets no son rastreables**: son unidades logísticas que agrupan casos y no se serializan, así que no tienen EPC ni historial. La unidad trazable es la **caja (case)**.
 
@@ -58,6 +58,8 @@ Todas con contraseña **`Seed1234`**:
 | Hospital San Rafael | `retailer` | `hospital@seed.nodoo.local` |
 
 ### Historia sembrada
+
+Los valores siguientes (organizaciones, lotes, EPCs y aviso) son datos de demostración de un ejemplo de cadena; la plataforma es agnóstica de sector.
 
 El laboratorio comisiona 3 cajas de vacuna (`LOTE-VAC-2026-1117-A`) y 2 cajas de insulina (`LOTE-INS-2026-1117-B`), las envía y factura a la distribuidora, que las recibe. Luego la distribuidora envía/factura una caja de vacuna al hospital (recibida) y una caja de insulina que queda `in_transit` (aún sin recibir). Queda un **retiro** del lote de vacuna con 2 acuses (distribuidora y hospital). Los pallets asociados no se serializan.
 
