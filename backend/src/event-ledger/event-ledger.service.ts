@@ -167,7 +167,7 @@ export class EventLedgerService {
           bizTransactionId: null,
           disposition: EpcStatus.ACTIVE,
           source: 'platform',
-          eventUid: null,
+          eventUid: randomUUID(),
           payload: {
             type: EventType.OBJECT,
             bizStep: BizStep.COMMISSIONING,
