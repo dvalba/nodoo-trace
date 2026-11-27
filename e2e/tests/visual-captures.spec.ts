@@ -62,7 +62,10 @@ for (const screen of screens) {
         'VISUAL_CAPTURES no seteado: corre con `VISUAL_CAPTURES=antes|despues pnpm test:visual`',
       );
     }
-    const outDir = path.resolve(process.cwd(), '../e2e-evidence/sprint-02/visual', mode);
+    // Destino por sprint (convención del README de e2e/): cada sprint
+    // apunta aquí su corrida de capturas. La línea base «antes» congelada
+    // (pre-S2-3b) queda preservada en sprint-02/visual/antes.
+    const outDir = path.resolve(process.cwd(), '../e2e-evidence/sprint-04/visual', mode);
     mkdirSync(outDir, { recursive: true });
 
     if (screen.auth) {

@@ -12,8 +12,8 @@ pnpm seed         # idempotent demo chain; builds backend then runs dist/scripts
 pnpm db:up | db:down | db:reset   # docker compose; db:reset wipes the volume
 pnpm lint         # oxlint, backend only (no frontend lint)
 pnpm test         # backend unit tests only (vitest, pure mocks, no DB)
-pnpm test:e2e:web # web E2E suite (Playwright in e2e/ package, spec 001 US16–US19); self-bootstraps DB supply_chain_e2e (drop/create/seed) and its own backend+web; keep the dev stack stopped (ports 3001/4200 free); evidence copied to e2e-evidence/sprint-NN/ (git-ignored)
-pnpm test:visual  # capture utility (US19, FR-1509): `VISUAL_CAPTURES=antes|despues`; runs OUTSIDE the default suite (`testIgnore`) with its own config (`playwright.visual.config.ts`) — FR-1507: the default suite must contain no `test.skip`/fixed waits
+pnpm test:e2e:web # web E2E suite (Playwright in e2e/ package, spec 001 US16–US19); self-bootstraps DB supply_chain_e2e (drop/create/seed) and its own backend+web; keep the dev stack stopped (ports 3001/4200 free); evidence copied to e2e-evidence/sprint-NN/ (git-ignored) — pass the sprint explicitly to the copy script (`node scripts/copy-evidence.ts sprint-NN` from e2e/), its default is `sprint-02`
+pnpm test:visual  # capture utility (US19, FR-1509): `VISUAL_CAPTURES=antes|despues`; runs OUTSIDE the default suite (`testIgnore`) with its own config (`playwright.visual.config.ts`) — FR-1507: the default suite must contain no `test.skip`/fixed waits. The PNG destination is the `outDir` in `e2e/tests/visual-captures.spec.ts` (`e2e-evidence/sprint-NN/visual/<modo>/`): point it at the current sprint when the sprint starts (the frozen `antes` baseline stays in `sprint-02/visual/antes`)
 pnpm build        # nest build + ng build (this is also the typecheck; there is no tsc script)
 ```
 
