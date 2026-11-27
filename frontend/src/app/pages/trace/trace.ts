@@ -1498,7 +1498,6 @@ export class Trace implements OnInit, AfterViewChecked, OnDestroy {
 
     try {
       await action();
-      this.actionMessage.set(successMessage);
       this.invoiceNumber = '';
       this.invoiceRecipient = '';
       this.poNumber = '';
@@ -1511,6 +1510,10 @@ export class Trace implements OnInit, AfterViewChecked, OnDestroy {
       this.disassociateSelection = [];
       this.load(twin.id);
       await this.loadCases();
+      // G13: the success message is set AFTER load(), because load() clears
+      // actionMessage/actionError synchronously (and its async .then never
+      // touches them); setting it first made it get wiped before rendering.
+      this.actionMessage.set(successMessage);
     } catch (err: unknown) {
       this.actionError.set(this.messageFrom(err, 'No se pudo completar la acción.'));
     } finally {
