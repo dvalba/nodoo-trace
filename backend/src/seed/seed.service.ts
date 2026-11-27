@@ -9,6 +9,8 @@ import { UserStatus } from '../users/enums/user-status.enum.js';
 import { Product } from '../products/entities/product.entity.js';
 import { Batch } from '../products/entities/batch.entity.js';
 import { EventLedgerService } from '../event-ledger/event-ledger.service.js';
+import { BizStep } from '../event-ledger/epics-core/enums/biz-step.enum.js';
+import { EventAction } from '../event-ledger/epics-core/enums/event-action.enum.js';
 import { ProductNotice } from '../notices/entities/product-notice.entity.js';
 import { ProductNoticeEpc } from '../notices/entities/product-notice-epc.entity.js';
 import { ProductNoticeAck } from '../notices/entities/product-notice-ack.entity.js';
@@ -25,9 +27,11 @@ export const SEED_IDS = {
   notice: '7d6f2a5b-9e8c-4f7a-8b65-ac9d8e7f6a54',
 } as const;
 
-// Cases are the traceable unit: each one is commissioned as an EPC. Pallets
-// are logistics units and are intentionally NOT serialized, so they have no
-// EPC here (and therefore no ledger history).
+// Cases are the traceable unit: each one is commissioned as an EPC. The
+// units of content each case holds are separate digital twins (their own
+// EPC and history, FR-D7), packed into the case. Pallets are logistics units
+// and are intentionally NOT serialized, so they have no EPC here (and
+// therefore no ledger history).
 export const SEED_EPC_IDS = {
   vaccine: [
     'urn:nodoo:epc:1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
@@ -38,7 +42,28 @@ export const SEED_EPC_IDS = {
     'urn:nodoo:epc:4d5e6f7a-8b9c-4d0e-1f2a-3b4c5d6e7f8a',
     'urn:nodoo:epc:5e6f7a8b-9c0d-4e1f-2a3b-4c5d6e7f8a9b',
   ],
+  // Two content units per case (FR-D7: case and content are separable
+  // twins linked by aggregation). The UI abbreviates each EPC as the first
+  // 8 chars of the last ':'-separated segment (the whole UUID here), so
+  // every content unit gets a unique 8-char prefix — distinct from each
+  // other and from the five case prefixes (1a2b3c4d…5e6f7a8b).
+  vaccineContent: [
+    'urn:nodoo:epc:a1000001-0000-4000-8000-000000000001',
+    'urn:nodoo:epc:a2000002-0000-4000-8000-000000000002',
+    'urn:nodoo:epc:a3000003-0000-4000-8000-000000000003',
+    'urn:nodoo:epc:a4000004-0000-4000-8000-000000000004',
+    'urn:nodoo:epc:a5000005-0000-4000-8000-000000000005',
+    'urn:nodoo:epc:a6000006-0000-4000-8000-000000000006',
+  ],
+  insulinContent: [
+    'urn:nodoo:epc:a7000007-0000-4000-8000-000000000007',
+    'urn:nodoo:epc:a8000008-0000-4000-8000-000000000008',
+    'urn:nodoo:epc:a9000009-0000-4000-8000-000000000009',
+    'urn:nodoo:epc:aa00000a-0000-4000-8000-00000000000a',
+  ],
 } as const;
+
+const CONTENT_UNITS_PER_CASE = 2;
 
 export const SEED_NOTICE_ID = SEED_IDS.notice;
 
@@ -147,9 +172,11 @@ export class SeedService {
       }),
     );
 
-    // ── Traceable cases ─────────────────────────────────────────────────────
-    // Each case is commissioned as an EPC. The pallets that group them are
-    // not serialized, so they deliberately do not appear in the ledger.
+    // ── Traceable cases and their content ───────────────────────────────────
+    // Each case is commissioned as an EPC, and every unit of content it
+    // holds is its own EPC (separate twin, FR-D7). The pallets that group
+    // the cases are not serialized, so they deliberately do not appear in
+    // the ledger.
     const vaccineCases = [];
     for (let i = 0; i < SEED_EPC_IDS.vaccine.length; i += 1) {
       vaccineCases.push(
@@ -157,6 +184,17 @@ export class SeedService {
           productId: vaccineProduct.id,
           batchId: vaccineBatch.id,
         }),
+      );
+    }
+
+    const vaccineContent: { id: string }[][] = [];
+    for (let i = 0; i < vaccineCases.length; i += 1) {
+      vaccineContent.push(
+        await this.seedContentUnits(
+          manufacturer.id,
+          vaccineProduct.id,
+          vaccineBatch.id,
+        ),
       );
     }
 
@@ -170,13 +208,42 @@ export class SeedService {
       );
     }
 
+    const insulinContent: { id: string }[][] = [];
+    for (let i = 0; i < insulinCases.length; i += 1) {
+      insulinContent.push(
+        await this.seedContentUnits(
+          manufacturer.id,
+          insulinProduct.id,
+          insulinBatch.id,
+        ),
+      );
+    }
+
     await this.reassignEpcIds(vaccineCases, SEED_EPC_IDS.vaccine);
     await this.reassignEpcIds(insulinCases, SEED_EPC_IDS.insulin);
+    await this.reassignEpcIds(vaccineContent.flat(), SEED_EPC_IDS.vaccineContent);
+    await this.reassignEpcIds(insulinContent.flat(), SEED_EPC_IDS.insulinContent);
 
-    // The manufacturer ships and invoices every case to the distributor,
-    // which receives each case into custody.
-    for (const cases of [vaccineCases, insulinCases]) {
-      for (const item of cases) {
+    // The content is packed into its case (aggregation with the packing
+    // business step), so case and content travel together.
+    const caseContent = [
+      ...vaccineCases.map((box, i) => ({ box, units: vaccineContent[i] })),
+      ...insulinCases.map((box, i) => ({ box, units: insulinContent[i] })),
+    ];
+    for (const { box, units } of caseContent) {
+      await this.eventLedgerService.aggregate(
+        manufacturer.id,
+        box.id,
+        { childEpcs: units.map((unit) => unit.id) },
+        EventAction.ADD,
+        BizStep.PACKING,
+      );
+    }
+
+    // The manufacturer ships and invoices every case and its content to the
+    // distributor, which receives each one into custody.
+    for (const { box, units } of caseContent) {
+      for (const item of [box, ...units]) {
         await this.eventLedgerService.ship(manufacturer.id, item.id, {
           destinationActorId: distributor.id,
         });
@@ -188,28 +255,34 @@ export class SeedService {
       }
     }
 
-    // The distributor forwards one vaccine case to the hospital and it is
-    // received there.
-    const vaccineToHospital = vaccineCases[0].id;
-    await this.eventLedgerService.ship(distributor.id, vaccineToHospital, {
-      destinationActorId: hospital.id,
-    });
-    await this.eventLedgerService.invoice(distributor.id, vaccineToHospital, {
-      bizTransactionId: 'INV-2026-0002',
-      ownershipTransferTo: hospital.id,
-    });
-    await this.eventLedgerService.receive(hospital.id, vaccineToHospital);
+    // The distributor forwards one vaccine case (with its content) to the
+    // hospital and it is received there.
+    const vaccineToHospital = caseContent[0];
+    for (const item of [vaccineToHospital.box, ...vaccineToHospital.units]) {
+      await this.eventLedgerService.ship(distributor.id, item.id, {
+        destinationActorId: hospital.id,
+      });
+      await this.eventLedgerService.invoice(distributor.id, item.id, {
+        bizTransactionId: 'INV-2026-0002',
+        ownershipTransferTo: hospital.id,
+      });
+      await this.eventLedgerService.receive(hospital.id, item.id);
+    }
 
-    // One insulin case is invoiced to the hospital but left in transit, so the
-    // the seed also shows a case that has not been received yet.
-    const insulinToHospital = insulinCases[0].id;
-    await this.eventLedgerService.ship(distributor.id, insulinToHospital, {
-      destinationActorId: hospital.id,
-    });
-    await this.eventLedgerService.invoice(distributor.id, insulinToHospital, {
-      bizTransactionId: 'INV-2026-0003',
-      ownershipTransferTo: hospital.id,
-    });
+    // One insulin case (with its content) is invoiced to the hospital but
+    // left in transit, so the seed also shows a case that has not been
+    // received yet.
+    const insulinToHospital =
+      caseContent[vaccineCases.length];
+    for (const item of [insulinToHospital.box, ...insulinToHospital.units]) {
+      await this.eventLedgerService.ship(distributor.id, item.id, {
+        destinationActorId: hospital.id,
+      });
+      await this.eventLedgerService.invoice(distributor.id, item.id, {
+        bizTransactionId: 'INV-2026-0003',
+        ownershipTransferTo: hospital.id,
+      });
+    }
 
     // ── Backdate so the story reads like real history ──────────────────────
     await this.backdateActors([
@@ -219,12 +292,20 @@ export class SeedService {
     ]);
     await this.backdateUsers(SEED_EMAILS, 39);
     await this.backdateEpcEvents([
-      { ids: vaccineCases.map((item) => item.id), days: 36 },
-      { ids: insulinCases.map((item) => item.id), days: 30 },
+      {
+        ids: [...vaccineCases, ...vaccineContent.flat()].map((item) => item.id),
+        days: 36,
+      },
+      {
+        ids: [...insulinCases, ...insulinContent.flat()].map((item) => item.id),
+        days: 30,
+      },
     ]);
     await this.backdateTwin([
       ...vaccineCases.map((item) => ({ id: item.id, days: 36 })),
+      ...vaccineContent.flat().map((item) => ({ id: item.id, days: 36 })),
       ...insulinCases.map((item) => ({ id: item.id, days: 30 })),
+      ...insulinContent.flat().map((item) => ({ id: item.id, days: 30 })),
     ]);
 
     // ── Recall with acknowledgements (fixed id, created directly) ──────────
@@ -238,8 +319,29 @@ export class SeedService {
 
     this.logger.log(
       `Seeded cases: vaccine ${vaccineCases.map((item) => item.id).join(', ')}; ` +
-        `insulin ${insulinCases.map((item) => item.id).join(', ')}`,
+        `insulin ${insulinCases.map((item) => item.id).join(', ')}; ` +
+        `content: ${[...vaccineContent.flat(), ...insulinContent.flat()]
+          .map((item) => item.id)
+          .join(', ')}`,
     );
+  }
+
+  /** G9: each case holds a few units of content, each its own EPC. */
+  private async seedContentUnits(
+    actorId: string,
+    productId: string,
+    batchId: string,
+  ): Promise<{ id: string }[]> {
+    const units: { id: string }[] = [];
+    for (let i = 0; i < CONTENT_UNITS_PER_CASE; i += 1) {
+      units.push(
+        await this.eventLedgerService.commission(actorId, {
+          productId,
+          batchId,
+        }),
+      );
+    }
+    return units;
   }
 
   private async seedActor(actorRepo: Repository<Actor>, seed: SeedActor) {
