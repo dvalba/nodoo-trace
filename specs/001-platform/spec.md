@@ -300,7 +300,7 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 **Acceptance Scenarios**:
 
 - **Given** la configuración, **When** el proveedor no está definido o es `file`, **Then** el sistema usa `FileEmailSender`, que escribe cada mensaje en un outbox JSON (`MAIL_OUTBOX_PATH`, default `backend/.mail-outbox.json`); cuando es `smtp` usa `SmtpEmailSender` (nodemailer).
-- **Given** `SmtpEmailSender`, **When** envía, **Then** mapea `from` (default `SMTP_FROM`, fallback `noreply@nodoo-trace.local`), `to`, `subject`, `text` y `html`, con puerto default 587 y `secure` default false, y propaga cualquier error de `sendMail` sin capturarlos.
+- **Given** `SmtpEmailSender`, **When** envía, **Then** mapea `from` (default `SMTP_FROM`, fallback `no-reply@nodoo.local`), `to`, `subject`, `text` y `html`, con puerto default 587 y `secure` default false, y propaga cualquier error de `sendMail` sin capturarlos.
 - **Given** la validación de env, **When** `EMAIL_PROVIDER=smtp`, **Then** exige `SMTP_HOST`, `SMTP_USER` y `SMTP_PASS` no vacía (error nombrando las variables faltantes); cuando es `file` o ausente no exige `SMTP_*`.
 - **Given** un valor inválido de `EMAIL_PROVIDER`, **When** arranca la app, **Then** la validación (Joi) rechaza el arranque nombrando la variable.
 - **Given** el env, **When** se documenta, **Then** `.env.example` incluye la sección `# EMAIL` con cada variable y su default, y `pnpm setup` la propaga al `.env`.
@@ -516,7 +516,7 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 #### US14 — Email provider
 
 - **FR-1401**: SI `EMAIL_PROVIDER` está ausente o es `file`, EL SISTEMA usa `FileEmailSender` (outbox JSON en `MAIL_OUTBOX_PATH`, default `backend/.mail-outbox.json`); CUANDO es `smtp`, usa `SmtpEmailSender` (nodemailer).
-- **FR-1402**: CUANDO `SmtpEmailSender` envía, EL SISTEMA mapea `from` (default `SMTP_FROM`, fallback `noreply@nodoo-trace.local`), `to`, `subject`, `text` y `html` (default puerto 587, `secure` false) y propaga el error de `sendMail` sin capturarlos.
+- **FR-1402**: CUANDO `SmtpEmailSender` envía, EL SISTEMA mapea `from` (default `SMTP_FROM`, fallback `no-reply@nodoo.local`), `to`, `subject`, `text` y `html` (default puerto 587, `secure` false) y propaga el error de `sendMail` sin capturarlos.
 - **FR-1403**: CUANDO `EMAIL_PROVIDER=smtp`, EL SISTEMA valida (Joi) que `SMTP_HOST`, `SMTP_USER` y `SMTP_PASS` estén presentes y no vacías (error nombrando las variables); CUANDO es `file` o ausente, NO las exige.
 - **FR-1404**: SI `EMAIL_PROVIDER` tiene un valor inválido, EL SISTEMA rechaza el arranque nombrando la variable.
 - **FR-1405**: EL SISTEMA documenta la sección `# EMAIL` completa en `.env.example` y `pnpm setup` la propaga al `.env`.
