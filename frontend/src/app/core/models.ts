@@ -185,6 +185,13 @@ export type EpcStatus =
   | 'damaged'
   | 'expired';
 
+/**
+ * Digital twin of an EPC as seen by the caller. The API filters it by scope
+ * (FR-605): the owner reads it whole; the current custodian without the
+ * producer; the destination of an in-transit case only the EPC and its
+ * product. Fields that would reveal upstream information are `null` in the
+ * scoped views.
+ */
 export interface Epc {
   id: string;
   productId: string;
@@ -192,12 +199,12 @@ export interface Epc {
   batchId: string | null;
   batch: Batch | null;
   parentId: string | null;
-  producerActorId: string;
+  producerActorId: string | null;
   ownerActorId: string | null;
   custodianActorId: string | null;
   destinationActorId: string | null;
   status: EpcStatus;
-  commissionedAt: string;
+  commissionedAt: string | null;
 }
 
 export interface EpcSearchResult {

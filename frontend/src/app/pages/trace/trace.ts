@@ -1,12 +1,17 @@
 import {
   AfterViewChecked,
   Component,
+  ElementRef,
+  OnDestroy,
   OnInit,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import jsQR from 'jsqr';
+import { toDataURL } from 'qrcode';
 import { Api } from '../../core/api.service';
 import { Auth } from '../../core/auth.service';
 import { Directory } from '../../core/directory.service';
@@ -125,6 +130,66 @@ interface SearchItem {
           <div class="mt-3 text-sm" style="color: var(--color-danger)">{{ error() }}</div>
         }
       </div>
+
+      @if (canReceive()) {
+        <section class="card">
+          <h2 class="text-sm font-semibold mb-1">Recibir un caso</h2>
+          <p class="text-xs text-mut mb-3">
+            Lee la etiqueta física del caso que llega, ingresa su EPC o
+            escanéalo con la cámara y confirma la recepción.
+          </p>
+          <div class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[240px]">
+              <label class="block text-sm mb-1" for="receiveEpc">
+                EPC de la etiqueta
+              </label>
+              <input
+                id="receiveEpc"
+                [(ngModel)]="receiveInput"
+                (keyup.enter)="receiveByLabel()"
+                class="field font-mono text-xs"
+                placeholder="urn:nodoo:epc:…"
+              />
+            </div>
+            <button
+              type="button"
+              class="btn-secondary"
+              [disabled]="receiving() || cameraActive()"
+              (click)="toggleCamera()"
+            >
+              {{ cameraActive() ? 'Cerrar cámara' : 'Usar cámara' }}
+            </button>
+            <button
+              type="button"
+              class="btn-primary"
+              [disabled]="receiving() || cameraActive()"
+              (click)="receiveByLabel()"
+            >
+              {{ receiving() ? 'Procesando…' : 'Recibir caso' }}
+            </button>
+          </div>
+
+          @if (cameraError()) {
+            <div class="mt-3 text-sm" style="color: var(--color-danger)">{{ cameraError() }}</div>
+          }
+
+          <video
+            #cameraVideo
+            class="camera-video"
+            [style.display]="cameraActive() ? 'block' : 'none'"
+            autoplay
+            muted
+            playsinline
+          ></video>
+
+          @if (receiveError()) {
+            <div class="mt-3 text-sm" style="color: var(--color-danger)">{{ receiveError() }}</div>
+          }
+          @if (receiveMessage()) {
+            <div class="mt-3 text-sm" style="color: var(--color-success)">{{ receiveMessage() }}</div>
+          }
+        </section>
+      }
 
       @if (results().length > 1) {
         <section class="card">
@@ -250,20 +315,20 @@ interface SearchItem {
                 </div>
                 <div>
                   <dt class="text-mut text-xs">Productor</dt>
-                  <dd class="mt-0.5">{{ actorName(twin.producerActorId) }}</dd>
+                  <dd class="mt-0.5">{{ actorLabel(twin.producerActorId) }}</dd>
                 </div>
                 <div>
                   <dt class="text-mut text-xs">Propietario</dt>
-                  <dd class="mt-0.5">{{ actorName(twin.ownerActorId) }}</dd>
+                  <dd class="mt-0.5">{{ actorLabel(twin.ownerActorId) }}</dd>
                 </div>
                 <div>
                   <dt class="text-mut text-xs">Custodio</dt>
-                  <dd class="mt-0.5">{{ actorName(twin.custodianActorId) }}</dd>
+                  <dd class="mt-0.5">{{ actorLabel(twin.custodianActorId) }}</dd>
                 </div>
                 @if (twin.destinationActorId) {
                   <div>
                     <dt class="text-mut text-xs">Destino</dt>
-                    <dd class="mt-0.5">{{ actorName(twin.destinationActorId) }}</dd>
+                    <dd class="mt-0.5">{{ actorLabel(twin.destinationActorId) }}</dd>
                   </div>
                 }
                 @if (twin.parentId) {
@@ -280,6 +345,24 @@ interface SearchItem {
 
               <div class="mt-4 pt-3 border-t border-border">
                 <div class="text-xs text-mut break-all font-mono">{{ twin.id }}</div>
+                @if (qrUrl()) {
+                  <div class="mt-3 flex items-center gap-3">
+                    <img
+                      id="qrLabel"
+                      [src]="qrUrl() ?? ''"
+                      alt="Etiqueta QR del caso"
+                      class="h-32 w-32 rounded border border-border bg-white p-1"
+                    />
+                    <a
+                      id="qrDownload"
+                      [href]="qrUrl() ?? ''"
+                      [download]="'etiqueta-' + short(twin.id) + '.png'"
+                      class="text-xs text-accent no-underline hover:underline"
+                    >
+                      Descargar etiqueta
+                    </a>
+                  </div>
+                }
               </div>
             </section>
 
@@ -306,14 +389,6 @@ interface SearchItem {
                         </select>
                         <button type="button" class="btn-primary" [disabled]="acting() || !shipDestination" (click)="ship()">
                           {{ acting() ? 'Procesando…' : 'Enviar caso' }}
-                        </button>
-                      </div>
-                    }
-
-                    @if (canReceive()) {
-                      <div class="space-y-2">
-                        <button type="button" class="btn-primary" [disabled]="acting()" (click)="receive()">
-                          {{ acting() ? 'Procesando…' : 'Recibir caso' }}
                         </button>
                       </div>
                     }
@@ -600,6 +675,28 @@ interface SearchItem {
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .btn-secondary {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-2);
+      color: var(--color-ink);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .btn-secondary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .camera-video {
+      width: 100%;
+      max-height: 240px;
+      margin-top: 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--color-border);
+      background: #0b0f17;
+      object-fit: contain;
+    }
     .case-row {
       width: 100%;
       display: flex;
@@ -679,12 +776,14 @@ interface SearchItem {
     }
   `,
 })
-export class Trace implements OnInit, AfterViewChecked {
+export class Trace implements OnInit, AfterViewChecked, OnDestroy {
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
   private readonly directory = inject(Directory);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  private cameraVideo = viewChild<ElementRef<HTMLVideoElement>>('cameraVideo');
 
   query = '';
   readonly busy = signal(false);
@@ -696,11 +795,30 @@ export class Trace implements OnInit, AfterViewChecked {
   readonly results = signal<Epc[]>([]);
   readonly searchedItems = signal<SearchItem[]>([]);
 
+  // Etiqueta QR del gemelo (FR-1204): se genera en el cliente a partir del
+  // URN completo cuando el caso carga, para imprimirse como etiqueta física.
+  // Es el mismo QR que la cámara de esta página puede escanear (FR-602).
+  readonly qrUrl = signal<string | null>(null);
+
   readonly myActorId = signal<string | null>(null);
   readonly myOperations = signal<ReadonlySet<string>>(new Set());
   readonly acting = signal(false);
   readonly actionError = signal<string | null>(null);
   readonly actionMessage = signal<string | null>(null);
+
+  // Receiving by label (FR-602/FR-D5): the actor reads the physical label —
+  // manual entry is the primary flow, the browser camera is optional and
+  // only fills the field. The server is the one that validates the EPC.
+  receiveInput = '';
+  readonly receiving = signal(false);
+  readonly receiveError = signal<string | null>(null);
+  readonly receiveMessage = signal<string | null>(null);
+  readonly cameraActive = signal(false);
+  readonly cameraError = signal<string | null>(null);
+
+  private stream: MediaStream | null = null;
+  private canvas: HTMLCanvasElement | null = null;
+  private rafId = 0;
 
   shipDestinations: ActorSummary[] = [];
   shipDestination = '';
@@ -824,11 +942,21 @@ export class Trace implements OnInit, AfterViewChecked {
     this.epc.set(null);
     this.history.set([]);
     this.notices.set([]);
+    this.qrUrl.set(null);
 
     Promise.all([this.api.getEpc(urn), this.api.getHistory(urn)])
       .then(([epc, history]) => {
         this.epc.set(epc);
         this.history.set(history);
+        // FR-1204: el QR codifica el URN exacto del gemelo; si el encoder
+        // fallara, el gemelo sigue siendo utilizable sin etiqueta.
+        toDataURL(epc.id, {
+          width: 320,
+          margin: 2,
+          errorCorrectionLevel: 'M',
+        })
+          .then((url) => this.qrUrl.set(url))
+          .catch(() => this.qrUrl.set(null));
         if (epc.productId) {
           this.api
             .listNotices(epc.productId)
@@ -845,7 +973,6 @@ export class Trace implements OnInit, AfterViewChecked {
   anyAction(): boolean {
     return (
       this.canShip() ||
-      this.canReceive() ||
       this.canInvoice() ||
       this.canPo() ||
       this.canDesadv() ||
@@ -868,15 +995,10 @@ export class Trace implements OnInit, AfterViewChecked {
     );
   }
 
+  // Receiving is not an action on a twin loaded from a list (FR-D5): it is
+  // performed by reading the physical EPC label, from its own card.
   canReceive(): boolean {
-    const twin = this.epc();
-    if (!twin || twin.status !== 'in_transit') return false;
-    return (
-      (this.isOwner(twin) ||
-        this.isCustodian(twin) ||
-        this.isDestination(twin)) &&
-      this.hasOperation('object:receiving')
-    );
+    return this.hasOperation('object:receiving');
   }
 
   canInvoice(): boolean {
@@ -1034,10 +1156,130 @@ export class Trace implements OnInit, AfterViewChecked {
     );
   }
 
-  receive(): void {
-    const twin = this.epc();
-    if (!twin) return;
-    void this.runAction(() => this.api.receiveEpc(twin.id), 'Caso recibido.');
+  receiveByLabel(): void {
+    const epcId = this.receiveInput.trim();
+    if (!epcId) {
+      this.receiveError.set('Ingresa o escanea el EPC de la etiqueta física.');
+      return;
+    }
+
+    this.receiving.set(true);
+    this.receiveError.set(null);
+    this.receiveMessage.set(null);
+
+    this.api
+      .receiveEpc(epcId)
+      .then((epc) => {
+        this.receiveMessage.set('Caso recibido.');
+        this.receiveInput = '';
+        if (this.epc()?.id === epc.id) {
+          this.load(epc.id);
+        }
+        void this.loadCases();
+      })
+      .catch((err: unknown) => {
+        this.receiveError.set(
+          this.messageFrom(err, 'No se pudo completar la recepción.'),
+        );
+      })
+      .finally(() => this.receiving.set(false));
+  }
+
+  toggleCamera(): void {
+    if (this.cameraActive()) {
+      this.stopCamera();
+      return;
+    }
+    void this.startCamera();
+  }
+
+  private async startCamera(): Promise<void> {
+    this.cameraError.set(null);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.cameraError.set('Este navegador no permite usar la cámara.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      this.stream = stream;
+
+      const video = this.cameraVideo()?.nativeElement;
+      if (!video) {
+        this.stopCamera();
+        return;
+      }
+      video.srcObject = stream;
+      await video.play();
+
+      this.cameraActive.set(true);
+      this.canvas = document.createElement('canvas');
+      this.scanLoop();
+    } catch (err: unknown) {
+      this.stopCamera();
+      const name = (err as { name?: string })?.name;
+      if (name === 'NotAllowedError') {
+        this.cameraError.set('Permiso de cámara denegado.');
+      } else if (name === 'NotFoundError') {
+        this.cameraError.set('No se encontró una cámara.');
+      } else {
+        this.cameraError.set('No se pudo abrir la cámara.');
+      }
+    }
+  }
+
+  private scanLoop(): void {
+    const video = this.cameraVideo()?.nativeElement;
+    const canvas = this.canvas;
+    if (!this.cameraActive() || !video || !canvas) return;
+
+    if (video.readyState >= 2 && video.videoWidth > 0) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, canvas.width, canvas.height, {
+          inversionAttempts: 'dontInvert',
+        });
+        if (code && code.data.trim()) {
+          this.onQrRead(code.data.trim());
+          return;
+        }
+      }
+    }
+
+    this.rafId = requestAnimationFrame(() => this.scanLoop());
+  }
+
+  private onQrRead(data: string): void {
+    this.receiveInput = data;
+    this.cameraError.set(null);
+    this.stopCamera();
+  }
+
+  private stopCamera(): void {
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = 0;
+    }
+    this.stream?.getTracks().forEach((track) => track.stop());
+    this.stream = null;
+    const video = this.cameraVideo()?.nativeElement;
+    if (video) {
+      video.srcObject = null;
+    }
+    this.canvas = null;
+    this.cameraActive.set(false);
+  }
+
+  ngOnDestroy(): void {
+    this.stopCamera();
   }
 
   invoice(): void {
@@ -1112,6 +1354,11 @@ export class Trace implements OnInit, AfterViewChecked {
     return this.directory.name(id);
   }
 
+  // Scoped twin views (FR-605) hide upstream actors: null renders as «—».
+  actorLabel(id: string | null): string {
+    return id ? this.directory.name(id) : '—';
+  }
+
   statusColor(status: EpcStatus): string {
     return STATUS_STYLES[status] ?? '#8a97ad';
   }
@@ -1139,7 +1386,10 @@ export class Trace implements OnInit, AfterViewChecked {
     return parts.join(' · ');
   }
 
-  date(value: string): string {
+  date(value: string | null): string {
+    if (!value) {
+      return '—';
+    }
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) {
       return value;
