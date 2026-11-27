@@ -29,6 +29,7 @@ import { ShipEpcDto } from './dto/ship-epc.dto.js';
 import { InspectEpcDto } from './dto/inspect-epc.dto.js';
 import { TransactionEpcDto } from './dto/transaction-epc.dto.js';
 import { AssociateEpcDto } from './dto/associate-epc.dto.js';
+import type { EpcView } from './dto/epc-view.type.js';
 import {
   TwinProjector,
   type ProjectableLink,
@@ -36,6 +37,16 @@ import {
 } from './twin-projector.js';
 
 const EPC_URN_PREFIX = 'urn:nodoo:epc:';
+
+/**
+ * FR-604 scope of an EPC row for the caller: the EPCs it owns, the ones it
+ * custodies, and the in-transit cases addressed to it — minus the EPCs it
+ * produced but is no longer the owner of (FR-D6: a producer that is no
+ * longer the owner sees nothing, even if it still custodies the case).
+ */
+const EPC_SCOPE_CLAUSE =
+  '((epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId OR (epc.destinationActorId = :actorId AND epc.status = :inTransit))' +
+  ' AND NOT (epc.producerActorId = :actorId AND epc.ownerActorId <> :actorId))';
 
 function custodyTarget(
   payload: Record<string, unknown>,
@@ -92,7 +103,7 @@ export interface EpcHistoryEntry {
 }
 
 export interface EpcSearchResult {
-  cases: Epc[];
+  cases: EpcView[];
   items: { product: Product; batches: Batch[] }[];
 }
 
@@ -234,6 +245,13 @@ export class EventLedgerService {
     return this.dataSource.transaction(async (manager) => {
       const [epc] = await this.findCustodiedEpcs(manager, actorId, [epcId]);
 
+      // Edge case (spec l.174): shipping a case already in transit -> 400.
+      if (epc.status === EpcStatus.IN_TRANSIT) {
+        throw new BadRequestException(
+          'The EPC is already in transit and cannot be shipped again.',
+        );
+      }
+
       const [updated] = await this.append(manager, {
         draft: {
           type: EventType.OBJECT,
@@ -314,6 +332,21 @@ export class EventLedgerService {
   ): Promise<Epc> {
     return this.dataSource.transaction(async (manager) => {
       const epc = await this.findReadableEpc(manager, actorId, epcId);
+
+      // FR-701: issuer role of each business document. A purchase order is
+      // issued by a non-owner (the buyer); a despatch advice and a bill of
+      // lading are issued by the current custodian.
+      if (bizTransactionType === BizTransactionType.PO) {
+        if (epc.ownerActorId === actorId) {
+          throw new BadRequestException(
+            'A purchase order cannot be issued by the owner of the EPC.',
+          );
+        }
+      } else if (epc.custodianActorId !== actorId) {
+        throw new BadRequestException(
+          'A despatch advice or bill of lading can only be issued by the current custodian of the EPC.',
+        );
+      }
 
       const [updated] = await this.append(manager, {
         draft: {
@@ -405,6 +438,29 @@ export class EventLedgerService {
         throw new BadRequestException(
           'Parent and child EPCs must belong to the same product.',
         );
+      }
+
+      if (action === EventAction.ADD) {
+        // FR-803: adding must never create a descent. The parent chain is a
+        // simple chain (one parentId per EPC), so an EPC is a descendant of
+        // another when walking the parent links from it reaches the other.
+        const parentAncestors = await this.ancestorIds(manager, parentId);
+        for (const childId of childIds) {
+          if (parentAncestors.has(childId)) {
+            throw new BadRequestException(
+              'The parent is a descendant of this child; adding it would create a cycle in the aggregation.',
+            );
+          }
+        }
+
+        for (const childId of childIds) {
+          const childAncestors = await this.ancestorIds(manager, childId);
+          if (childAncestors.has(parentId)) {
+            throw new BadRequestException(
+              'This EPC is already a descendant of the parent and cannot be added again.',
+            );
+          }
+        }
       }
 
       return this.append(manager, {
@@ -516,15 +572,16 @@ export class EventLedgerService {
   async listEpc(
     actorId: string,
     filter: { productId?: string; batchId?: string; q?: string } = {},
-  ): Promise<Epc[]> {
+  ): Promise<EpcView[]> {
     const query = this.epcRepo
       .createQueryBuilder('epc')
       .innerJoinAndSelect('epc.product', 'product')
       .leftJoinAndSelect('epc.batch', 'batch')
-      .where(
-        '(epc.producerActorId = :actorId OR epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId OR epc.destinationActorId = :actorId)',
-        { actorId },
-      );
+      // FR-604: the caller sees the EPCs of their scope only.
+      .where(EPC_SCOPE_CLAUSE, {
+        actorId,
+        inTransit: EpcStatus.IN_TRANSIT,
+      });
 
     if (filter.productId) {
       query.andWhere('epc.productId = :productId', {
@@ -544,7 +601,14 @@ export class EventLedgerService {
       );
     }
 
-    return query.orderBy('epc.commissionedAt', 'DESC').getMany();
+    const rows = await query.orderBy('epc.commissionedAt', 'DESC').getMany();
+
+    // FR-605: the twin is filtered by scope in the list as well — a
+    // custodian row never exposes the producer, a destination row exposes
+    // only the EPC and its product.
+    return rows
+      .map((row) => this.scopedView(row, actorId))
+      .filter((view): view is EpcView => view !== null);
   }
 
   async search(actorId: string, q: string): Promise<EpcSearchResult> {
@@ -558,10 +622,9 @@ export class EventLedgerService {
 
     const rows = await this.epcRepo
       .createQueryBuilder('epc')
-      .where(
-        '(epc.producerActorId = :actorId OR epc.ownerActorId = :actorId OR epc.custodianActorId = :actorId OR epc.destinationActorId = :actorId)',
-        { actorId },
-      )
+      // Same scope as listEpc (FR-604), used to tell which catalog items
+      // already have a readable case.
+      .where(EPC_SCOPE_CLAUSE, { actorId, inTransit: EpcStatus.IN_TRANSIT })
       .select('epc.productId', 'productId')
       .addSelect('epc.batchId', 'batchId')
       .getRawMany<{ productId: string; batchId: string | null }>();
@@ -604,17 +667,22 @@ export class EventLedgerService {
     return { cases, items: [...items.values()] };
   }
 
-  async getEpc(actorId: string, epcId: string): Promise<Epc> {
+  async getEpc(actorId: string, epcId: string): Promise<EpcView> {
     const epc = await this.epcRepo.findOne({
       where: { id: epcId },
       relations: { product: true, batch: true },
     });
 
-    if (!epc || !this.canRead(epc, actorId)) {
+    if (!epc) throwNotFound('Epc', epcId);
+
+    const view = this.scopedView(epc, actorId);
+    if (!view) {
+      // FR-D2/FR-D6: no readable scope (producer no longer the owner, or
+      // unrelated organization) -> 404, never 403.
       throwNotFound('Epc', epcId);
     }
 
-    return epc;
+    return view;
   }
 
   async getHistory(
@@ -624,10 +692,30 @@ export class EventLedgerService {
     const epc = await this.epcRepo.findOne({ where: { id: epcId } });
     if (!epc) throwNotFound('Epc', epcId);
 
-    if (this.canRead(epc, actorId)) {
+    const scope = this.twinScope(epc, actorId);
+
+    if (scope === 'full') {
+      // FR-606: the owner gets the entire chain.
       return this.readHistory(epcId);
     }
 
+    if (scope === 'destination') {
+      // FR-606: the destination of an in-transit case gets 404 until it
+      // receives (after receiving, it becomes the custodian of its window).
+      throwNotFound('Epc', epcId);
+    }
+
+    if (scope === 'none' && epc.producerActorId === actorId) {
+      // FR-D6: a producer that is no longer the owner sees nothing about
+      // the EPC, even though the commissioning gave it a first custody
+      // window in the ledger.
+      throwNotFound('Epc', epcId);
+    }
+
+    // 'custody' (current custodian) or 'none' with a past window (former
+    // custodian): FR-D4/FR-606 give only the events of the actor's own
+    // custody window, never the upstream chain. An unrelated organization
+    // has no window and gets 404 (FR-D2).
     const history = await this.readHistory(epcId);
     const window = this.custodianWindow(history, actorId);
     if (window.length === 0) throwNotFound('Epc', epcId);
@@ -802,7 +890,7 @@ export class EventLedgerService {
         bizTransactionId: options.draft.bizTransactionId,
         disposition: options.draft.disposition,
         source: 'platform',
-        eventUid: null,
+        eventUid: randomUUID(),
         payload,
       }),
     );
@@ -839,7 +927,13 @@ export class EventLedgerService {
     });
   }
 
-  private async applyMutations(
+  /**
+   * Applies twin mutations from a projector. Public so external ingestion
+   * (US15, FR-2004) projects imported events with the exact same rules as
+   * local ones; callers must drop `create` mutations for EPCs that already
+   * exist (see `dropCreateMutationsForExisting`).
+   */
+  public async applyMutations(
     manager: EntityManager,
     mutations: TwinMutation[],
   ): Promise<void> {
@@ -909,15 +1003,30 @@ export class EventLedgerService {
     actorId: string,
     epcId: string,
   ): Promise<Epc> {
-    const epc = await manager.findOne(Epc, {
-      where: [
-        { id: epcId, ownerActorId: actorId },
-        { id: epcId, custodianActorId: actorId },
-        { id: epcId, destinationActorId: actorId },
-      ],
-    });
+    const epc = await manager.findOne(Epc, { where: { id: epcId } });
 
     if (!epc) throwNotFound('Epc', epcId);
+
+    // FR-D2: an organization with no relation to the EPC gets 404.
+    const hasRelation =
+      epc.ownerActorId === actorId ||
+      epc.custodianActorId === actorId ||
+      epc.producerActorId === actorId ||
+      epc.destinationActorId === actorId;
+
+    if (!hasRelation) throwNotFound('Epc', epcId);
+
+    // FR-602: only the destination of an in-transit case can receive it.
+    // Edge cases (spec l.173): receiving a case without a destination or
+    // one already received -> 400.
+    if (
+      epc.destinationActorId !== actorId ||
+      epc.status !== EpcStatus.IN_TRANSIT
+    ) {
+      throw new BadRequestException(
+        'The EPC is not in transit to the caller and cannot be received.',
+      );
+    }
 
     return epc;
   }
@@ -953,16 +1062,100 @@ export class EventLedgerService {
     return epcs;
   }
 
+  /**
+   * Ids of the parent chain above an EPC (excluding the EPC itself),
+   * following the single `parentId` link. Bounded by a `seen` guard in case
+   * the ledger contains a cycle created before the descent check existed.
+   */
+  private async ancestorIds(
+    manager: EntityManager,
+    startId: string,
+  ): Promise<Set<string>> {
+    const ancestors = new Set<string>();
+    const seen = new Set<string>();
+    let cursor = startId;
+
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      const row = await manager.findOne(Epc, {
+        where: { id: cursor },
+        select: { id: true, parentId: true },
+      });
+      if (!row || !row.parentId) break;
+      ancestors.add(row.parentId);
+      cursor = row.parentId;
+    }
+
+    return ancestors;
+  }
+
   private mintEpcId(): string {
     return `${EPC_URN_PREFIX}${randomUUID()}`;
   }
 
+  /**
+   * Visibility scope of an EPC's digital twin for an actor (FR-D2..FR-D6,
+   * FR-604/FR-605):
+   *
+   * - 'full': the owner reads the twin and the whole history.
+   * - 'custody': the current custodian reads the twin without the producer
+   *   and the history limited to its custody window.
+   * - 'destination': the destination of an in-transit case reads only the
+   *   EPC + product; the history stays 404 until it receives.
+   * - 'none': everything else, including a producer that is no longer the
+   *   owner (FR-D6) and unrelated organizations (404 per FR-D2).
+   *
+   * A former custodian (not the producer) resolves to 'none' here but is
+   * served its custody window by getHistory.
+   */
+  private twinScope(
+    epc: Epc,
+    actorId: string,
+  ): 'full' | 'custody' | 'destination' | 'none' {
+    if (epc.ownerActorId === actorId) return 'full';
+    if (epc.producerActorId === actorId) return 'none';
+    if (epc.custodianActorId === actorId) return 'custody';
+    if (
+      epc.destinationActorId === actorId &&
+      epc.status === EpcStatus.IN_TRANSIT
+    ) {
+      return 'destination';
+    }
+    return 'none';
+  }
+
+  /**
+   * The digital twin of an EPC as seen by a given actor (FR-605), or null
+   * when the actor has no readable scope for it (404 per FR-D2/FR-D6).
+   */
+  private scopedView(epc: Epc, actorId: string): EpcView | null {
+    switch (this.twinScope(epc, actorId)) {
+      case 'full':
+        return epc;
+      case 'custody':
+        // FR-605/FR-D4: the custodian sees the twin without the producer or
+        // any upstream reference; the owner identity is kept (FR-D4).
+        return { ...epc, producerActorId: null };
+      case 'destination':
+        // FR-605/FR-D5: the destination of an in-transit case sees only the
+        // EPC and its product (plus the transit state that makes it a
+        // shipment addressed to them).
+        return {
+          ...epc,
+          producerActorId: null,
+          ownerActorId: null,
+          custodianActorId: null,
+          batchId: null,
+          batch: null,
+          parentId: null,
+          commissionedAt: null,
+        };
+      default:
+        return null;
+    }
+  }
+
   private canRead(epc: Epc, actorId: string): boolean {
-    return (
-      epc.ownerActorId === actorId ||
-      epc.custodianActorId === actorId ||
-      epc.producerActorId === actorId ||
-      epc.destinationActorId === actorId
-    );
+    return this.twinScope(epc, actorId) !== 'none';
   }
 }

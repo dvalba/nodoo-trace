@@ -8,6 +8,7 @@ import { Batch } from '../products/entities/batch.entity.js';
 import { EventEpc } from './entities/event-epc.entity.js';
 import { Actor } from '../actor/entities/actor.entity.js';
 import { BizStep } from './epics-core/enums/biz-step.enum.js';
+import { EpcStatus } from './epics-core/enums/epc-status.enum.js';
 import { EventType } from './epics-core/enums/event-type.enum.js';
 import { EventEpcRole } from './enums/event-epc-role.enum.js';
 
@@ -142,7 +143,7 @@ describe('EventLedgerService.getHistory', () => {
     ]);
   });
 
-  it('gives the owner and the producer the full history', async () => {
+  it('gives the owner the full history (FR-606)', async () => {
     const { service } = makeService(
       {
         ownerActorId: 'owner-1',
@@ -152,11 +153,27 @@ describe('EventLedgerService.getHistory', () => {
       custodyLinks(),
     );
 
-    expect(await service.getHistory('owner-1', EPC_ID)).toHaveLength(5);
-    expect(await service.getHistory(PRODUCER, EPC_ID)).toHaveLength(5);
+    const history = await service.getHistory('owner-1', EPC_ID);
+
+    expect(history.map((entry) => entry.id)).toEqual(['1', '2', '3', '4', '5']);
   });
 
-  it('limits a former custodian to their window, including the handover', async () => {
+  it('hides the history from a producer that is no longer the owner, even while it custodies the EPC (FR-D6)', async () => {
+    const { service } = makeService(
+      {
+        ownerActorId: 'owner-1',
+        producerActorId: PRODUCER,
+        custodianActorId: PRODUCER,
+      },
+      custodyLinks(),
+    );
+
+    await expect(service.getHistory(PRODUCER, EPC_ID)).rejects.toThrow(
+      'Epc not found',
+    );
+  });
+
+  it('limits a former custodian to their window, including the handover (FR-D4)', async () => {
     const { service } = makeService(
       {
         ownerActorId: PRODUCER,
@@ -171,7 +188,7 @@ describe('EventLedgerService.getHistory', () => {
     expect(history.map((entry) => entry.id)).toEqual(['3', '4', '5']);
   });
 
-  it('gives the current custodian the full history', async () => {
+  it('limits the current custodian to their own custody window (FR-D4/FR-606)', async () => {
     const { service } = makeService(
       {
         ownerActorId: PRODUCER,
@@ -183,7 +200,24 @@ describe('EventLedgerService.getHistory', () => {
 
     const history = await service.getHistory(CUSTODIAN_C, EPC_ID);
 
-    expect(history.map((entry) => entry.id)).toEqual(['1', '2', '3', '4', '5']);
+    expect(history.map((entry) => entry.id)).toEqual(['5']);
+  });
+
+  it('hides the history from the destination of an in-transit case until it receives (FR-606)', async () => {
+    const { service } = makeService(
+      {
+        ownerActorId: PRODUCER,
+        producerActorId: PRODUCER,
+        custodianActorId: PRODUCER,
+        destinationActorId: CUSTODIAN_C,
+        status: EpcStatus.IN_TRANSIT,
+      },
+      custodyLinks(),
+    );
+
+    await expect(service.getHistory(CUSTODIAN_C, EPC_ID)).rejects.toThrow(
+      'Epc not found',
+    );
   });
 
   it('hides the history from actors with no custody relation', async () => {
@@ -209,5 +243,116 @@ describe('EventLedgerService.getHistory', () => {
       'Epc not found',
     );
     expect(createQueryBuilder).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventLedgerService.getEpc', () => {
+  it('gives the owner the whole twin (FR-605)', async () => {
+    const { service } = makeService(
+      {
+        id: EPC_ID,
+        ownerActorId: 'owner-1',
+        producerActorId: PRODUCER,
+        custodianActorId: 'owner-1',
+        status: EpcStatus.ACTIVE,
+      },
+      [],
+    );
+
+    const twin = await service.getEpc('owner-1', EPC_ID);
+
+    expect(twin.producerActorId).toBe(PRODUCER);
+    expect(twin.ownerActorId).toBe('owner-1');
+    expect(twin.custodianActorId).toBe('owner-1');
+  });
+
+  it('hides the producer from the current custodian (FR-605/FR-D4)', async () => {
+    const { service } = makeService(
+      {
+        id: EPC_ID,
+        ownerActorId: 'owner-1',
+        producerActorId: PRODUCER,
+        custodianActorId: CUSTODIAN_B,
+        status: EpcStatus.ACTIVE,
+      },
+      [],
+    );
+
+    const twin = await service.getEpc(CUSTODIAN_B, EPC_ID);
+
+    expect(twin.producerActorId).toBeNull();
+    expect(twin.ownerActorId).toBe('owner-1');
+    expect(twin.custodianActorId).toBe(CUSTODIAN_B);
+  });
+
+  it('gives the destination of an in-transit case only the EPC and its product (FR-605/FR-D5)', async () => {
+    const { service } = makeService(
+      {
+        id: EPC_ID,
+        ownerActorId: 'owner-1',
+        producerActorId: PRODUCER,
+        custodianActorId: 'owner-1',
+        destinationActorId: CUSTODIAN_C,
+        batchId: 'batch-1',
+        parentId: `${EPC_ID}-parent`,
+        commissionedAt: new Date('2026-10-01T00:00:00.000Z'),
+        status: EpcStatus.IN_TRANSIT,
+      },
+      [],
+    );
+
+    const twin = await service.getEpc(CUSTODIAN_C, EPC_ID);
+
+    expect(twin.id).toBe(EPC_ID);
+    expect(twin.status).toBe(EpcStatus.IN_TRANSIT);
+    expect(twin.destinationActorId).toBe(CUSTODIAN_C);
+    expect(twin.producerActorId).toBeNull();
+    expect(twin.ownerActorId).toBeNull();
+    expect(twin.custodianActorId).toBeNull();
+    expect(twin.batchId).toBeNull();
+    expect(twin.parentId).toBeNull();
+    expect(twin.commissionedAt).toBeNull();
+  });
+
+  it('hides the twin from a producer that is no longer the owner (FR-D6)', async () => {
+    const { service } = makeService(
+      {
+        id: EPC_ID,
+        ownerActorId: 'owner-1',
+        producerActorId: PRODUCER,
+        custodianActorId: CUSTODIAN_B,
+        status: EpcStatus.ACTIVE,
+      },
+      [],
+    );
+
+    await expect(service.getEpc(PRODUCER, EPC_ID)).rejects.toThrow(
+      'Epc not found',
+    );
+  });
+
+  it('hides the twin from unrelated organizations (FR-D2)', async () => {
+    const { service } = makeService(
+      {
+        id: EPC_ID,
+        ownerActorId: 'owner-1',
+        producerActorId: PRODUCER,
+        custodianActorId: CUSTODIAN_B,
+        status: EpcStatus.ACTIVE,
+      },
+      [],
+    );
+
+    await expect(service.getEpc('stranger', EPC_ID)).rejects.toThrow(
+      'Epc not found',
+    );
+  });
+
+  it('hides the twin when the EPC does not exist', async () => {
+    const { service } = makeService(null, []);
+
+    await expect(service.getEpc(ACTOR, EPC_ID)).rejects.toThrow(
+      'Epc not found',
+    );
   });
 });

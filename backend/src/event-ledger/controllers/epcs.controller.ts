@@ -51,7 +51,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Receive an EPC into custody',
     description:
-      'Appends a receiving event and makes the caller the current custodian of the EPC. Allowed for the owner, the current custodian or the organization the EPC was shipped to.',
+      'Appends a receiving event and makes the caller the current custodian of the EPC. Only the destination of an EPC that is in transit can receive it; any other case (no destination, already received, addressed to someone else) is rejected with 400, and an EPC with no relation to the caller with 404.',
   })
   receive(@Caller() user: AuthUser, @Param('epc') epc: string) {
     return this.eventLedgerService.receive(user.actorId, epc);
@@ -63,7 +63,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Ship an EPC to another organization',
     description:
-      'Appends a shipping event, marks the EPC as in transit and records the destination actor. Only the destination, the owner or the custodian can receive it afterwards.',
+      'Appends a shipping event, marks the EPC as in transit and records the destination actor. Only the current custodian can ship it, and an EPC already in transit cannot be shipped again (400). Afterwards only the destination can receive it.',
   })
   ship(
     @Caller() user: AuthUser,
@@ -95,7 +95,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Register a purchase order for an EPC',
     description:
-      'Appends a purchase order transaction event. Typically issued by the buyer before the goods are shipped.',
+      'Appends a purchase order transaction event. Issued by a non-owner (typically the buyer); the owner of the EPC is rejected with 400.',
   })
   purchaseOrder(
     @Caller() user: AuthUser,
@@ -116,7 +116,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Register a despatch advice for an EPC',
     description:
-      'Appends a despatch advice transaction event. Typically issued by the sender when dispatching the goods.',
+      'Appends a despatch advice transaction event. Only the current custodian of the EPC can issue it; any other organization is rejected with 400.',
   })
   despatchAdvice(
     @Caller() user: AuthUser,
@@ -137,7 +137,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Register a bill of lading for an EPC',
     description:
-      'Appends a bill of lading transaction event for the transport of the EPC.',
+      'Appends a bill of lading transaction event. Only the current custodian of the EPC can issue it; any other organization is rejected with 400.',
   })
   billOfLading(
     @Caller() user: AuthUser,
@@ -174,7 +174,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Add EPCs to a parent container',
     description:
-      'Appends an aggregation event and links the child EPCs to the parent EPC.',
+      'Appends an aggregation event and links the child EPCs to the parent EPC. All EPCs must belong to the same product, and the addition must not create a descent (an EPC already in the parent chain, or the parent already a descendant of a child) in either direction; both cases are rejected with 400.',
   })
   aggregate(
     @Caller() user: AuthUser,
@@ -303,7 +303,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'List the EPCs visible to the caller',
     description:
-      'Returns the EPCs the caller produced, owns, custodies or is the destination of, optionally filtered by product, batch or a free-text search on EPC id, SKU, product name or batch code.',
+      'Returns the EPCs of the caller scope (FR-604): the ones it owns, the ones it custodies, and the in-transit cases addressed to it. A producer that is no longer the owner sees none of them. Optionally filtered by product, batch or a free-text search on EPC id, SKU, product name or batch code.',
   })
   list(
     @Caller() user: AuthUser,
@@ -323,7 +323,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Get the EPC event history',
     description:
-      'Returns the ledger events the EPC took part in, in chronological order. Producers, owners, custodians and destinations get the full history; any other custodian in transit only gets their custody window.',
+      'Returns the ledger events the EPC took part in, in chronological order, scoped by role (FR-606): the owner gets the whole chain; a custodian (current or former) only the events of its own custody window; the destination of an in-transit case gets 404 until it receives; a producer that is no longer the owner and any unrelated organization get 404 (never 403).',
   })
   history(@Caller() user: AuthUser, @Param('epc') epc: string) {
     return this.eventLedgerService.getHistory(user.actorId, epc);
@@ -334,7 +334,7 @@ export class EpcsController {
   @ApiOperation({
     summary: 'Get the EPC digital twin',
     description:
-      'Returns the current projection of the EPC. Only its producer, owner, custodian or destination organization can read it.',
+      'Returns the current projection of the EPC, filtered by the caller scope (FR-605): the owner reads it whole; the current custodian without the producer or upstream references; the destination of an in-transit case only the EPC and its product. A producer that is no longer the owner and any unrelated organization get 404 (never 403).',
   })
   get(@Caller() user: AuthUser, @Param('epc') epc: string) {
     return this.eventLedgerService.getEpc(user.actorId, epc);
