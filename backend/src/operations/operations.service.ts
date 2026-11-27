@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -64,6 +65,14 @@ export class OperationsService {
   ): Promise<{ actorId: string; activities: ActivityRef[] }> {
     const actor = await this.loadActorWithActivities(actorId);
 
+    // G6 (FR-204/205, note 3): onboarding is one-shot — once the
+    // organization has activities, it cannot accept another set.
+    if (actor.activities.length > 0) {
+      throw new ConflictException(
+        'The organization has already completed its onboarding.',
+      );
+    }
+
     const activities = await this.activityService.findWithOperationsByCodes(
       dto.activityCodes,
     );
@@ -97,6 +106,14 @@ export class OperationsService {
         relations: { activities: true },
       });
       if (!actor) throw new NotFoundException('Actor not found');
+
+      // G6 (FR-204/205, note 3): onboarding is one-shot — once the
+      // organization has activities, it cannot create a custom one.
+      if (actor.activities.length > 0) {
+        throw new ConflictException(
+          'The organization has already completed its onboarding.',
+        );
+      }
 
       const distinctOps = new Set(dto.operations);
       const operations = await manager.findBy(Operation, {
