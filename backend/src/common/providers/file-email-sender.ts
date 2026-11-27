@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { EmailMessage, EmailSender } from "../interfaces/email-sender.js";
 import { dirname } from "path";
 import { promises as fs } from 'node:fs';
@@ -14,7 +15,13 @@ interface StoredEmail {
 @Injectable()
 export class FileEmailSender implements EmailSender {
   private readonly logger = new Logger(FileEmailSender.name);
-  private readonly filePath = process.env.MAIL_OUTBOX_PATH ?? './.mail-outbox.json';
+  // G8 (FR-1401, spec note 5): configuration goes through ConfigService
+  // (validated by Joi in env.validation.ts), never raw process.env.
+  private readonly filePath: string;
+
+  constructor(config: ConfigService) {
+    this.filePath = config.get<string>('MAIL_OUTBOX_PATH') ?? './.mail-outbox.json';
+  }
 
   // Serializamos escrituras para que requests concurrentes no pisen el archivo
   private writeChain: Promise<void> = Promise.resolve();

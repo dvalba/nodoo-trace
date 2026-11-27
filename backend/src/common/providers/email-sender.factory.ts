@@ -5,5 +5,5 @@ import { SmtpEmailSender } from "./smtp-email-sender.js";
 
 export function createEmailSender(config: ConfigService): EmailSender {
   const provider = config.get<string>("EMAIL_PROVIDER") ?? "file";
-  return provider === "smtp" ? new SmtpEmailSender(config) : new FileEmailSender();
+  return provider === "smtp" ? new SmtpEmailSender(config) : new FileEmailSender(config);
 }
