@@ -5,10 +5,10 @@ Fase 1 de `/speckit.plan`. Documenta el modelo de datos as-built (baseline E1–
 ## Entidades del dominio (as-built)
 
 ### Organization (actor / tenant)
-- `id` (UUID), `name`, `contactEmail`, `contactName`, `phone` (optional), `logoUrl` (optional), `status` (`PENDING_APPROVAL` | `APPROVED`), `createdAt`, `updatedAt`
+- `id` (UUID), `name`, `organizationNumber` (optional), `status` (`PENDING_APPROVAL` | `APPROVED`), `createdAt`, `updatedAt`
 - **Onboarding** (US2, FR-201..208): el actor crea la organización desde su cuenta de propietario; selecciona `activities` (tipologías); el estado pasa de `PENDING_APPROVAL` a `APPROVED` por el staff (admin).
 - Un actor tiene exactamente una organización; un `User` pertenece a una organización (relación `User → Organization`).
-- La referencia de otro actor se resuelve por `contactEmail` (US2, FR-210) y expone solo `name` (FR-211, visibilidad cerrada).
+- La referencia de otro actor se pide por id (`GET /actors/:actorId`) y devuelve id, name, activities y operaciones derivadas (US2, FR-206).
 
 ### User
 - `id`, `email` (unique por organización), `passwordHash`, `name`, `role` (`OWNER` | `MANAGER` | `OPERATOR`), `organizationId` (FK), `emailVerifiedAt`, `createdAt`, `updatedAt`
@@ -36,7 +36,7 @@ Fase 1 de `/speckit.plan`. Documenta el modelo de datos as-built (baseline E1–
 ### LedgerEvent (evento EPCIS 2.0)
 - `id`, `eventUid` (unique, clave de dedupe), `organizationId` (FK, emisor/tenant), `eventType` (enum EPCIS: `ObjectEvent`, `TransactionEvent`, `TransformationEvent`, `aggregation`...), `eventTime`, `epc` (string, FK lógico a Epc), `operation` (referencia a la operación aplicada), `action` (`ADD` | `OBSERVE` | `DELETE`), `disposition` (optional), `recordedBy` (org), `source` (`platform` | `external`), `payload` (JSON, campos EPCIS: `bizStep`, `bizLocation`, `urn`...), `createdAt`
 - **Visibilidad cerrada** (US7, FR-D2..D6): el owner ve toda la cadena; el custodiante ve su ventana de custodia (incl. identidad del owner) pero no la cadena aguas arriba; el destino ve solo el caso en tránsito a su nombre; una org que ya no es owner no ve nada; una org sin relación recibe `404` (no `403`).
-- Ingesta externa (US15, FR-2001..2004): `eventUid` dedupe; `source = 'external'`; EPCs no comisionados no crean unidades.
+- Ingesta externa (US15, FR-2001..2005): `eventUid` dedupe; `source = 'external'`; EPCs no comisionados se crean con el owner pasado por el endpoint (FR-2005); sin owner → 400 sin efectos parciales. `eventUid` es la `eventID` del documento o un digest determinista `urn:nodoo:ingest:sha256` cuando el evento no la lleva. `biz_transaction_type` es `text` (no `varchar`): los tipos de transacción comercial EPCIS 2.0 pueden ser URIs de más de 32 caracteres.
 
 ### Twin (gemelo digital, estado actual por EPC)
 - Proyección mantenida por `twin-projector.ts`: estado actual, custodiante actual, ubicación/disposición actual, últimos eventos. Derivado de `LedgerEvent` (no fuente de verdad). US10, FR-D1.
@@ -96,4 +96,4 @@ Epc          1—1 Twin (proyección, derivada)
 ## Impacto del Sprint 02
 
 - **Ninguna entidad nueva ni cambio de esquema.** La capa E2E solo lee/escribe a través de la API REST existente contra la BD e2e (mismo esquema por `synchronize`).
-- **Sprint 04 (US15)**: no requiere nueva entidad; reutiliza `LedgerEvent` con `source='external'` y dedupe por `eventUid` (R6 de research.md).
+- **Sprint 04 (US15)**: no requiere nueva entidad; reutiliza `LedgerEvent` con `source='external'` y dedupe por `eventUid` (R6 de research.md, resuelto 2026-11-27: endpoint REST patrón Capture).

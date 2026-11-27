@@ -54,11 +54,11 @@ Fase 0 de `/speckit.plan`. Resuelve las incógnitas técnicas del plan (US16–U
 - Firefox/WebKit — descartado: fuera de spec.
 - `test.skip` condicionado a navegador ausente — prohibido explícitamente (FR-1507).
 
-## R6 — NEEDS CLARIFICATION de US15 (FR-2001): canal de importación EPCIS
+## R6 — Clarificación de US15 (FR-2001): canal de importación EPCIS
 
-**Decision**: se deja **sin resolver y fuera del alcance del Sprint 02**. La ingesta EPCIS 2.0 se planifica en su propio sprint (Sprint 04 propuesto), cuando el dueño decida el canal (archivo manual, endpoint REST o suscripción poll/notify) y el tratamiento de EPCs no comisionados. No hay tarea de Sprint 02 que dependa de ello.
+**Decision**: se dejó **sin resolver y fuera del alcance del Sprint 02** y se resolvió el 2026-11-27 con el dueño (Clarifications de la spec, S4-1): el canal es un **endpoint REST** (patrón EPCIS 2.0 Capture): el tercero empuja el documento en una petición autenticada con credencial por organización. Tratamiento de EPCs no comisionados: **el owner se pasa por el endpoint**; si la petición no lo pasa, el documento se rechaza con 400 sin efectos parciales (FR-2005). Fuera de scope para el MVP: subida manual de archivo y suscripción poll/notify (pull). No había tarea de Sprint 02 que dependiera de ello.
 
-**Rationale**: la spec lo marca como NEEDS CLARIFICATION y lo agenda a Sprint 04; investigar el canal ahora prematura sería trabajo sin spec aprobada (principio I). El plan solo fija la restricción futura: `eventUid` como clave de dedupe y `source` distinto de `platform` (FR-2002/FR-2003, constitución X).
+**Rationale**: la spec lo marcaba como NEEDS CLARIFICATION y lo agendaba a Sprint 04; investigar el canal entonces habría sido trabajo sin spec aprobada (principio I). El plan solo fija la restricción futura: `eventUid` como clave de dedupe y `source` distinto de `platform` (FR-2002/FR-2003, constitución X).
 
 **Alternatives considered**: presuponer "endpoint REST" — descartado: inventar el canal violaría el principio I.
 

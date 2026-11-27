@@ -41,6 +41,16 @@ nodoo-trace es una plataforma SaaS multi-tenant de trazabilidad **genérica, agn
 
 - Q: ¿Cómo se lee la etiqueta física QR en el receiving (FR-602): cámara del navegador o entrada manual del EPC? → A: **Entrada manual del EPC como flujo primario** (el destinatario ingresa el EPC impreso en la etiqueta física; el sistema valida que corresponda a un case `in_transit` a su favor, 400 si no) **y cámara del navegador como opción** (getUserMedia + decodificador QR que completa el campo). La cámara no sustituye al flujo manual: el manual es el flujo testeado en la e2e por historia (US17); el caso de cámara, que no puede ejecutarse en e2e headless, se declara explícitamente en el reporte (spec l.349).
 
+### Session 2026-11-26
+
+- Q: ¿La plataforma genera el código QR de la etiqueta física del EPC, y dónde? → A: Sí. El QR se genera **en el cliente** (frontend) a partir del URN completo del gemelo, para que la organización pueda imprimirlo como etiqueta física; el backend NO genera QR (el payload es solo el URN, ya presente en el gemelo, por lo que no se necesita un endpoint). El QR se muestra en la tarjeta del gemelo con opción de descarga y codifica el URN exacto del EPC: es el mismo QR que la cámara del navegador puede escanear (mismo sitio: crear y escanear; FR-602/FR-1204).
+- Q: O1 (revisión S2-4): E19 no aparece en el mapeo de historias (US10=E18 → US11=E20/E21) y SC-004 «cubre E1–E25» queda incompleto. ¿Cuál es el destino de E19? → A: **E19 se mapea a US14** (proveedor de correo file/smtp): es la única área as-built del baseline (módulo propio, FR-1401..1405) que no llevaba E# en el título de su historia. Con este mapeo, E1–E25 queda completo.
+
+### Session 2026-11-27
+
+- Q: S4-1/R6: ¿Canal de importación de documentos EPCIS 2.0 de terceros (FR-2001)? → A: **Endpoint REST** (patrón EPCIS 2.0 Capture): el tercero empuja el documento en una petición autenticada con credencial por organización. Fuera de scope para el MVP: subida manual de archivo desde la UI y suscripción poll/notify (pull).
+- Q: S4-1/R6: ¿Qué pasa con un EPC referenciado por el documento que no está comisionado en la plataforma? → A: **El owner se pasa por el endpoint**: si el EPC no viene asociado a su owner, la petición debe pasárselo; con owner, el sistema crea el EPC con ese owner; sin owner, rechaza el documento con 400 sin efectos parciales (FR-2005).
+
 ## Usuarios / actores
 
 - **Manufacturer / producer** (supplier, manufacturer): comisiona EPCs, transforma, inspecciona.
@@ -281,7 +291,7 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 
 - Seed con `.env` ausente o BD caída → falla con mensaje claro (no media creación).
 
-### User Story 14 — Proveedor de correo conmutable file/smtp (antes spec 001, RF-1..RF-5) - Priority: P2
+### User Story 14 — Proveedor de correo conmutable file/smtp (E19; antes spec 001, RF-1..RF-5) - Priority: P2
 
 **Why this priority**: el acceso (US1) y las invitaciones (US3) dependen de él; ya está construido y se incorpora aquí como baseline.
 
@@ -308,14 +318,16 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 
 **Acceptance Scenarios**:
 
-- **Given** un documento EPCIS 2.0 de un tercero (conjunto de eventos con enlaces EPC), **When** se importa, **Then** el sistema crea o extiende el historial de los EPCs referenciados. [NEEDS CLARIFICATION: canal de importación — archivo manual, endpoint REST o suscripción EPCIS poll/notify]
+- **Given** un tercero, **When** empuja un documento EPCIS 2.0 (conjunto de eventos con enlaces EPC) al endpoint REST (patrón Capture, petición autenticada con credencial por organización), **Then** el sistema crea o extiende el historial de los EPCs referenciados.
 - **Given** un evento importado, **When** su `eventUid` ya existe, **Then** el sistema lo ignora (importación idempotente).
 - **Given** un evento importado, **When** se persiste, **Then** lleva `source` distinto de `platform`.
 - **Given** eventos importados, **When** se proyectan, **Then** el gemelo se actualiza con las mismas reglas que los eventos locales.
+- **Given** un evento importado que referencia un EPC no comisionado en la plataforma, **When** la petición le pasa su owner por el endpoint, **Then** el sistema crea el EPC con ese owner y extiende su historial (FR-2005).
+- **Given** un evento importado que referencia un EPC no comisionado en la plataforma, **When** la petición no le pasa su owner, **Then** el sistema rechaza el documento con 400 sin efectos parciales (FR-2005).
 
 **Edge Cases**:
 
-- Evento que referencia un EPC no comisionado en la plataforma → crear el EPC con los datos del evento, o rechazar (NEEDS CLARIFICATION junto con el canal).
+- Evento que referencia un EPC no comisionado en la plataforma → la petición debe pasarle su owner por el endpoint: si lo pasa, se crea el EPC con ese owner; si no, 400 sin efectos parciales (FR-2005).
 - Documento vacío o malformado → 400 sin efectos parciales.
 
 ### User Story 16 — Infraestructura E2E con Playwright (NUEVO) - Priority: P1
@@ -495,6 +507,7 @@ Cada historia es una vertical slice: entrega ejecutable de punta a punta. P1 es 
 - **FR-1201**: EL SISTEMA frontend es un cliente delgado: consume la REST API `/api/v1` y no contiene lógica de negocio (visibilidad, gating y estado los decide el backend).
 - **FR-1202**: EL SISTEMA frontend expone los journeys: login, registro, verificación, invitación, onboarding, dashboard, productos, equipo, organización, aprobación de staff, avisos y trace.
 - **FR-1203**: CUANDO se abre la página de trace en un EPC, EL SISTEMA muestra el gemelo, el historial dentro del scope del actor y las acciones ejecutables según sus operations y el estado del case.
+- **FR-1204**: CUANDO se abre la página de trace en un EPC, EL SISTEMA genera **en el cliente** un código QR que codifica el URN completo del gemelo y lo muestra en la tarjeta del gemelo con opción de descarga (etiqueta física imprimible); la generación no requiere backend (el payload es el URN exacto del EPC) y el QR resultante es legible por el escáner de la propia aplicación (FR-602).
 
 #### US13 — Seed
 
@@ -543,10 +556,11 @@ Requisitos sin construir, agrupados por bloque. Los desvíos del código existen
 
 ### Ingesta de documentos EPCIS 2.0 de terceros (US15)
 
-- **FR-2001**: EL SISTEMA importa documentos EPCIS 2.0 de terceros (conjunto de eventos con enlaces EPC) y crea o extiende el historial de los EPCs referenciados. [NEEDS CLARIFICATION: canal de importación — archivo manual, endpoint REST o suscripción EPCIS poll/notify]
+- **FR-2001**: EL SISTEMA expone un endpoint REST (patrón EPCIS 2.0 Capture) al que un tercero empuja documentos EPCIS 2.0 (conjunto de eventos con enlaces EPC) en una petición autenticada con credencial por organización, y crea o extiende el historial de los EPCs referenciados.
 - **FR-2002**: CUANDO un evento importado tiene `eventUid` ya existente, EL SISTEMA lo ignora (importación idempotente).
 - **FR-2003**: CUANDO un evento se importa, EL SISTEMA lo persiste con `source` distinto de `platform`.
 - **FR-2004**: CUANDO se importan eventos, EL SISTEMA los proyecta sobre el gemelo con las mismas reglas que los eventos locales (FR-1001).
+- **FR-2005**: CUANDO un evento importado referencia un EPC no comisionado en la plataforma, EL SISTEMA exige que la petición le pase la organización owner por el endpoint; si la pasa, crea el EPC con ese owner; si no, rechaza el documento con 400 sin efectos parciales.
 
 ### Notas de cumplimiento (desvíos detectados al escribir la spec)
 
@@ -593,7 +607,7 @@ Para la revisión de código vs. spec (sprint de revisión). No son requisitos:
 - La plataforma es el system of record: eventos locales + importados.
 - Las organizaciones del seed son datos de demostración de un ejemplo de cadena: un producer, un distribuidor y una organización de destino (la plataforma es agnóstica de sector).
 - La URN del EPC la genera la plataforma con formato fijo.
-- La lectura de la etiqueta física (QR) se resuelve en el navegador: entrada manual del EPC como flujo primario, con cámara (getUserMedia + decodificador QR) como opción (resuelto en Clarifications, 2026-11-24).
+- La etiqueta física (QR) se resuelve íntegramente en el navegador: la plataforma genera el QR en el cliente a partir del URN completo del gemelo (para imprimir) y lo lee con entrada manual del EPC como flujo primario, con cámara (getUserMedia + decodificador QR) como opción (resuelto en Clarifications, 2026-11-24 y 2026-11-26).
 
 ## Out of scope
 
@@ -614,7 +628,7 @@ Cada user story es una vertical slice. El plan (`plan.md` + `tasks.md`, paso sig
 - **Sprint 01 (hecho)**: base SDD + email provider (T1–T11).
 - **Sprint 02**: plan de esta spec (S2-1) + infraestructura Playwright y smoke test (S2-2) + revisión visual de las pantallas actuales (S2-3) + revisión de cumplimiento de E1–E25 (S2-4; gaps → board/sprints; sin re-implementación) + cierre con tabla de evidencia (S2-5). No tiene user stories propias: su evidencia web es el smoke y la revisión visual.
 - **Sprint 03 (propuesto)**: cierre de gaps de custody/visibilidad (FR-D3..D6, FR-602, notas 1–2) — pendiente de la revisión. Primer sprint con user stories: aplica el criterio de cierre completo, con tests E2E por historia (US17) y evidencia en `e2e-evidence/sprint-03/`.
-- **Sprint 04 (propuesto)**: requisito nuevo de ingesta EPCIS 2.0 (FR-2001..2004) — pendiente de clarificación del canal.
+- **Sprint 04 (propuesto)**: requisito nuevo de ingesta EPCIS 2.0 (FR-2001..2005) — canal resuelto (endpoint REST patrón Capture; Clarifications 2026-11-27).
 
 **Criterio de cierre de sprint**: único para todo el proyecto y definido en la constitución (Quality Gates); las specs y los sprints solo lo apuntan, no lo redefinen.
 
@@ -631,4 +645,4 @@ La estructura final se confirma en el paso de plan.
 
 ## Open Questions
 
-- ¿Canal de importación EPCIS 2.0 de terceros: archivo manual, endpoint REST o suscripción EPCIS poll/notify? (FR-2001)
+- (Resuelta 2026-11-27) Canal de importación EPCIS 2.0 de terceros (FR-2001): **endpoint REST** (patrón Capture, credencial por organización); EPCs no comisionados → owner pasado por el endpoint, si no 400 sin efectos parciales (FR-2005). Ver Clarifications 2026-11-27.

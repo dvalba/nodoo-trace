@@ -6,7 +6,7 @@
 
 ## Summary
 
-Spec-first de legado: la plataforma ya existe (E1–E25, US1–US14) y la spec la codifica como baseline. Lo único sin construir son dos bloques: la ingesta de documentos EPCIS 2.0 de terceros (US15, Sprint 04, pendiente de clarificación del canal) y la capa E2E con Playwright (US16–US19, Sprint 02). El trabajo del Sprint 02 es: planificar la spec (S2-1), montar la infraestructura Playwright + smoke test (S2-2), revisar visualmente las pantallas actuales (S2-3) y auditar el código existente contra la spec (S2-4, sin re-implementación).
+Spec-first de legado: la plataforma ya existe (E1–E25, US1–US14) y la spec la codifica como baseline. Lo único sin construir son dos bloques: la ingesta de documentos EPCIS 2.0 de terceros (US15, Sprint 04, canal resuelto: endpoint REST patrón Capture — Clarifications 2026-11-27) y la capa E2E con Playwright (US16–US19, Sprint 02). El trabajo del Sprint 02 es: planificar la spec (S2-1), montar la infraestructura Playwright + smoke test (S2-2), revisar visualmente las pantallas actuales (S2-3) y auditar el código existente contra la spec (S2-4, sin re-implementación).
 
 Enfoque técnico: no se toca el stack existente (pnpm workspace, NestJS 12 + TypeORM + Postgres 16, Angular 21). Se añade un paquete `e2e/` con `@playwright/test` que ejecuta la suite web contra una BD e2e dedicada en la misma instancia local de Postgres, recreada y sembrada por ejecución; la evidencia de cierre vive en `e2e-evidence/` (fuera de git).
 

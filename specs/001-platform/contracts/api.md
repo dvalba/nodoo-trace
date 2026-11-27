@@ -30,7 +30,7 @@ Fase 1 de `/speckit.plan`. La interfaz externa del proyecto es la **API REST** b
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | `/actors` | Lista de actores (propio + referencias permitidas) |
-| GET | `/actors/:actorId` | Info del actor; la referencia de otro actor expone solo `name` (FR-211) |
+| GET | `/actors/:actorId` | Info del actor; la referencia de otro actor devuelve id, name, activities y operaciones derivadas (FR-206) |
 
 ### Admin (staff) — `admin` (US2)
 | Método | Ruta | Descripción |
@@ -101,8 +101,19 @@ Fase 1 de `/speckit.plan`. La interfaz externa del proyecto es la **API REST** b
 | POST | `/notices/:noticeId/ack` | Acuse de recibo |
 | GET | `/notices/:noticeId/acks` | Lista de acuses |
 
+### Ingesta EPCIS 2.0 — `epcis` (US15, FR-2001..FR-2005)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/epcis/capture` | Captura un documento EPCIS 2.0 de un tercero (patrón EPCIS 2.0 Capture, R6 resuelto 2026-11-27) |
+
+- Autenticado con la credencial de la organización que empuja (sin gating por `@RequiresOperation`; FR-2001 solo exige credencial). La organización llantera es la `actorId` de todos los eventos importados.
+- Body: el documento EPCIS 2.0 **sin modificar** como body completo (solo si todos los EPCs referenciados ya están comisionados) **o** el wrapper `{ document, epcMapping }` donde `epcMapping` lleva `{ ownerActorId, productId }` por cada EPC no comisionado (FR-2005). Sin el owner de un EPC no comisionado → `400` y sin efectos parciales (todo el documento se importa en una sola transacción).
+- Eventos persistidos con `source='external'` y `eventUid` = `eventID` del documento (o digest determinista `urn:nodoo:ingest:sha256` cuando el evento no la tiene); re-púsh con `eventUid` ya existente → ignorado (FR-2002, idempotente).
+- Proyección al twin con las reglas locales (FR-2004); los EPCs pre-creados por FR-2005 nunca se re-crean.
+- Respuesta `201`: `{ imported, skipped, epcsCreated }`.
+
 ### Storage — `storage`
-- Controlador placeholder sin endpoints (futuro ingreso masivo desde ERP; candidato a alojar la ingesta EPCIS de US15 en Sprint 04, pendiente de R6).
+- Controlador placeholder sin endpoints (futuro ingreso masivo desde ERP). La ingesta EPCIS de US15 (Sprint 04) ya no entra aquí: vive en `epcis-capture.controller.ts` (módulo `event-ledger`), decisión S4-2.
 
 ## Contrato del paquete `e2e/` (nuevo, Sprint 02)
 
