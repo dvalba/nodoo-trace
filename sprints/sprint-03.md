@@ -52,4 +52,21 @@ Cierre (solo si se cumple TODO el criterio de cierre de la constitución, Qualit
 - G1–G5 y G10 cerrados con sus tests; O1/O2 corregidas en la documentación de
   la spec.
 
-Retro: (se rellena al cerrar el sprint: qué regla faltaba en AGENTS.md o en una skill)
+Retro (2026-11-26):
+
+- **Regla que faltaba en AGENTS.md**: el script de copia de evidencia
+  (`e2e/scripts/copy-evidence.ts`) tiene por defecto `sprint-02`; la primera
+  corrida de S3-3 copió la evidencia al sprint equivocado. Añadida a la línea de
+  `pnpm test:e2e:web` de AGENTS.md: pasar el sprint explícitamente al script de
+  copia.
+- **Comportamientos de Playwright que costaron la primera corrida** (ahora
+  documentados en el header del spec us-06 y en `helpers.ts`): (1) Playwright
+  re-evalúa el módulo del spec tras un test fallido → el estado en variables de
+  archivo (`let urn`) no es fiable entre tests; cada test se hace autocontenido
+  derivando el URN en el punto de uso. (2) La página de login redirige sola si
+  hay token en `localStorage` de una corrida anterior → `helpers.login()` borra
+  `nodoo:token` antes de cada login (no por `addInitScript`: borraría el token
+  fresco dentro del test).
+- **Angular 21**: en select multiple el valor DOM de los `<option>` es la
+  codificación interna de `ɵNgSelectMultipleOption` (G14); los specs seleccionan
+  por etiqueta exacta del template, nunca por el value.
