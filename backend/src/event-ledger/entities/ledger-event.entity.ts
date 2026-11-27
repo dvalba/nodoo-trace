@@ -43,10 +43,11 @@ export class LedgerEvent {
   @Column({ name: 'biz_step', type: 'enum', enum: BizStep, nullable: true })
   bizStep: BizStep | null;
 
+  // `text` (not varchar): EPCIS 2.0 business transaction types can be
+  // arbitrary URIs longer than 32 chars (NFR-6, US15 ingestion).
   @Column({
     name: 'biz_transaction_type',
-    type: 'varchar',
-    length: 32,
+    type: 'text',
     nullable: true,
   })
   bizTransactionType: string | null;
