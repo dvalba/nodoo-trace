@@ -10,6 +10,12 @@ export default defineConfig({
   outputDir: './test-results',
   globalSetup: './scripts/reset-e2e-db.ts',
   timeout: 60_000,
+  // S3-2: los specs por historia (us-06, us-07, us-08) mutan el estado del
+  // seed compartido de `supply_chain_e2e`. Con un solo worker la suite corre
+  // de forma secuencial, en orden alfabético de archivos (us-06 < us-07 <
+  // us-08 < us16-smoke), que es parte del diseño: cada archivo es
+  // autocontenido, pero sus mutaciones no deben entrelazarse.
+  workers: 1,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
     baseURL: 'http://localhost:4200',
